@@ -88,7 +88,11 @@ input:focus,select:focus{outline:none;border-color:var(--pink);box-shadow:0 0 0 
 .champ small{font-family:Inter,sans-serif;color:#f3e8ff;font-weight:600}
 .read{margin-top:10px;font-family:Inter,sans-serif;font-weight:600;color:var(--ink);background:var(--yellow);border-radius:10px;padding:10px}
 
-.lane-tag{font:700 11px Inter,sans-serif;background:var(--pink);color:#fff;border-radius:999px;padding:2px 8px;vertical-align:middle;margin-left:4px}
+.l1{--lc:#ff3fa4} .l2{--lc:#2f7bff} .l3{--lc:#f06d00}
+.lane.l1 .lane-title,.lane.l2 .lane-title,.lane.l3 .lane-title{background:var(--lc)}
+.lane.l1,.lane.l2,.lane.l3{border-color:var(--lc)}
+.team.l1,.team.l2,.team.l3{border-left:8px solid var(--lc)}
+.lane-tag{font:700 11px Inter,sans-serif;background:var(--lc,var(--pink));color:#fff;border-radius:999px;padding:2px 8px;vertical-align:middle;margin-left:4px}
 .podium{margin-top:8px;font-family:Inter,sans-serif;font-weight:700;color:#fff}
 .edit-btn{margin-top:8px;background:none;border:0;padding:4px 0;color:var(--plum);font:700 14px Inter,sans-serif;text-decoration:underline;cursor:pointer}
 .team.editing{border-color:var(--pink)}
@@ -170,6 +174,7 @@ const READS = [
   "Serving looks? Yes. Serving strikes? Absolutely not.",
   "The shoes have seen things, and they've never seen worse."
 ];
+const LANE_DOT = { 1: '🩷', 2: '💙', 3: '🧡' };
 const blank = () => ({ teams: [], scores: {}, final: {}, third: {} });
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -248,12 +253,12 @@ function render(){
   const prev = $('tpick').value, prevL = $('lpick').value;
   $('tpick').innerHTML =
     (state.teams.length < MAX_TEAMS ? '<option value="__new">✨ Start a new team</option>' : '') +
-    open.map(t => `<option value="${t.id}">${esc(t.name)} · Lane ${t.lane} (${t.members.length}/${MAX_T})</option>`).join('');
+    open.map(t => `<option value="${t.id}">${LANE_DOT[t.lane]} ${esc(t.name)} · Lane ${t.lane} (${t.members.length}/${MAX_T})</option>`).join('');
   if ([...$('tpick').options].some(o => o.value === prev)) $('tpick').value = prev;
   if (!$('tpick').options.length) $('tpick').innerHTML = '<option value="">Lanes are full, darling</option>';
   $('newTeamWrap').hidden = $('tpick').value !== '__new';
   $('lpick').innerHTML = '<option value="">Choose a lane…</option>' + openLanes().map(l =>
-    `<option value="${l.n}">Lane ${l.n} — ${l.used ? '1 spot left (vs ' + esc(lanes()[l.n-1][0].name) + ')' : 'open'}</option>`).join('');
+    `<option value="${l.n}">${LANE_DOT[l.n]} Lane ${l.n} — ${l.used ? '1 spot left (vs ' + esc(lanes()[l.n-1][0].name) + ')' : 'open'}</option>`).join('');
   if ([...$('lpick').options].some(o => o.value === prevL)) $('lpick').value = prevL;
 
   // team list (left alone while someone is mid-edit so live updates don't wipe their changes)
@@ -261,8 +266,8 @@ function render(){
   if (!editing) $('teamList').innerHTML = state.teams.length ? state.teams.slice().sort((a, b) => a.lane - b.lane).map(t => {
     const n = t.members.length, cls = n < MIN_T ? 'low' : n >= MAX_T ? 'full' : 'ok';
     const lbl = n < MIN_T ? `${n}/${MAX_T} · need 1 more` : n >= MAX_T ? 'FULL' : `${n}/${MAX_T}`;
-    return `<div class="team">
-      <div class="team-head"><span class="team-name">${esc(t.name)} <span class="lane-tag">Lane ${t.lane}</span></span><span class="count ${cls}">${lbl}</span></div>
+    return `<div class="team l${t.lane}">
+      <div class="team-head"><span class="team-name">${esc(t.name)} <span class="lane-tag l${t.lane}">${LANE_DOT[t.lane]} Lane ${t.lane}</span></span><span class="count ${cls}">${lbl}</span></div>
       <button class="edit-btn" data-edit="${t.id}">✏️ Edit team</button>
       <div class="chips">${t.members.map((m, i) =>
         `<span class="chip">${esc(m)}<button aria-label="Remove ${esc(m)}" data-rm="${t.id}:${i}">×</button></span>`).join('')}</div>
@@ -273,8 +278,8 @@ function render(){
   $('lanes').innerHTML = lanes().map((pair, i) => {
     const w = laneWinner(pair), tied = pair[0] && pair[1] && best(pair, 'scores') === 'tie';
     const status = !pair[0] || !pair[1] ? 'Waiting for teams' : w ? 'Winner in!' : tied ? 'Tie! Roll-off' : 'In play';
-    return `<div class="lane">
-      <div class="lane-title">Lane ${i+1}<span class="status">${status}</span></div>
+    return `<div class="lane l${i+1}">
+      <div class="lane-title">${LANE_DOT[i+1]} Lane ${i+1}<span class="status">${status}</span></div>
       ${sideHTML(pair[0], w, 'scores')}
       <div class="vs">VS</div>
       ${sideHTML(pair[1], w, 'scores')}
@@ -316,7 +321,7 @@ function sideHTML(t, winner, bucket, note){
   const v = state[bucket][t.id];
   const win = winner && winner !== 'tie' && winner.id === t.id;
   return `<div class="side ${win ? 'win' : ''}">
-    <div class="who"><b>${esc(t.name)}</b><small>${note ? esc(note) + ' · ' : ''}${t.members.map(esc).join(', ') || '—'}</small></div>
+    <div class="who"><b>${esc(t.name)}${bucket !== 'scores' ? ` <span class="lane-tag l${t.lane}">Lane ${t.lane}</span>` : ''}</b><small>${note ? esc(note) + ' · ' : ''}${t.members.map(esc).join(', ') || '—'}</small></div>
     <input type="number" inputmode="numeric" min="0" max="900" placeholder="Score"
       aria-label="${esc(t.name)} total score" data-b="${bucket}" data-t="${t.id}" value="${v ?? ''}">
   </div>`;
