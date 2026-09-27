@@ -181,7 +181,7 @@ footer{text-align:center;color:#fff;font-family:Bungee,sans-serif;text-shadow:2p
       <button class="btn ghost" id="shuffleBtn">Shuffle lanes</button>
       <button class="btn ghost danger" id="resetBtn">Reset everything</button>
     </div>
-    <p class="hint">Data is saved on this device. Pass the host's phone around the lanes to keep one scoreboard.</p>
+    <p class="hint" id="syncNote">Saved on this device only. Pass the host's phone around the lanes to keep one scoreboard.</p>
   </section>
 
   <footer>Love to see you there 🪩</footer>
@@ -196,13 +196,42 @@ const READS = [
   "Serving looks? Yes. Serving strikes? Absolutely not.",
   "The shoes have seen things, and they've never seen worse."
 ];
-let state = load();
+const blank = () => ({ teams: [], order: [], scores: {}, final: {} });
+let state = load(), db = null;
 
 function load(){
   try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.teams) return s; } catch(e){}
-  return { teams: [], order: [], scores: {}, final: {} };
+  return blank();
 }
-function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){} }
+function save(){ if (!db) try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){} }
+
+/* ---------- shared scoreboard (when opened as a shared page) ---------- */
+const raw = { teams: [], players: [], scores: {} };
+function rebuild(){
+  const s = blank();
+  raw.teams.slice().sort((a, b) => a.order - b.order).forEach(t => {
+    const ps = raw.players.filter(p => p.team === t.id).sort((a, b) => a.created - b.created);
+    s.teams.push({ id: t.id, name: t.name, members: ps.map(p => p.name), pids: ps.map(p => p.id) });
+    s.order.push(t.id);
+    const sc = raw.scores[t.id] || {};
+    if (sc.r1 != null) s.scores[t.id] = sc.r1;
+    if (sc.final != null) s.final[t.id] = sc.final;
+  });
+  state = s; render();
+}
+const docs = snap => snap.docs.map(d => ({ id: d.id, ...d.data() }));
+const oops = e => { const m = $('joinMsg'); m.className = 'msg err';
+  m.textContent = e && e.code === 'not_granted' ? "You're view-only on this page — ask the host for edit access." : 'Could not save — check your connection and try again.'; };
+(async () => {
+  if (!window.claude || !window.claude.use) return;
+  const d = await window.claude.use('db');
+  if (!d) return;
+  db = d;
+  $('syncNote').textContent = '🟢 Live scoreboard — everyone with the link sees the same teams and scores.';
+  db.collection('teams').onSnapshot(q => { raw.teams = docs(q); rebuild(); });
+  db.collection('players').onSnapshot(q => { raw.players = docs(q); rebuild(); });
+  db.collection('scores').onSnapshot(q => { raw.scores = Object.fromEntries(docs(q).map(x => [x.id, x])); rebuild(); });
+})();
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -318,19 +347,21 @@ $('joinForm').addEventListener('submit', e => {
     if (!tn) return fail('Give your team a fabulous name.');
     if (state.teams.some(x => x.name.toLowerCase() === tn.toLowerCase())) return fail('That team name is taken — pick it from the list to join.');
     if (state.teams.length >= MAX_TEAMS) return fail('All 6 team slots are taken.');
-    t = { id: uid(), name: tn, members: [] };
-    state.teams.push(t); state.order.push(t.id);
+    t = { id: uid(), name: tn, members: [], pids: [] };
+    if (db) db.doc('teams/' + t.id).set({ name: tn, order: Date.now() }).catch(oops);
+    else { state.teams.push(t); state.order.push(t.id); }
   } else {
     t = team(pick);
     if (!t) return fail('Pick a team.');
     if (t.members.length >= MAX_T) return fail('That team is full (3 max).');
   }
-  t.members.push(name);
-  save(); render();
+  const pid = uid();
+  if (db) db.doc('players/' + pid).set({ name, team: t.id, created: Date.now() }).catch(oops);
+  else { t.members.push(name); t.pids = t.pids || []; t.pids.push(pid); save(); render(); }
   $('tpick').value = t.id; $('newTeamWrap').hidden = true;
   $('pname').value = ''; $('tname').value = '';
   msg.className = 'msg ok';
-  msg.textContent = t.members.length < MIN_T ? `${name} is on ${t.name}! Recruit one more bowler.` : `${name} joined ${t.name}. Work! 💃`;
+  msg.textContent = t.members.length + (db ? 1 : 0) < MIN_T ? `${name} is on ${t.name}! Recruit one more bowler.` : `${name} joined ${t.name}. Work! 💃`;
 });
 
 document.addEventListener('click', e => {
@@ -338,7 +369,13 @@ document.addEventListener('click', e => {
   if (!rm) return;
   const [id, i] = rm.split(':'), t = team(id);
   if (!confirm(`Remove ${t.members[i]} from ${t.name}?`)) return;
-  t.members.splice(+i, 1);
+  if (db) {
+    const pid = t.pids && t.pids[i];
+    if (pid) db.doc('players/' + pid).delete().catch(oops);
+    if (t.members.length === 1) { db.doc('teams/' + id).delete().catch(oops); db.doc('scores/' + id).delete().catch(oops); }
+    return;
+  }
+  t.members.splice(+i, 1); if (t.pids) t.pids.splice(+i, 1);
   if (!t.members.length) {
     state.teams = state.teams.filter(x => x !== t);
     state.order = state.order.filter(x => x !== id);
@@ -351,7 +388,12 @@ document.addEventListener('change', e => {
   const { b, t } = e.target.dataset;
   if (!b || rendering) return;
   const raw = e.target.value.trim(), n = Math.max(0, Math.min(900, parseInt(raw, 10)));
-  if (raw === '' || isNaN(n)) delete state[b][t]; else state[b][t] = n;
+  const v = raw === '' || isNaN(n) ? null : n;
+  if (db) {
+    db.doc('scores/' + t).set({ r1: b === 'scores' ? v : (state.scores[t] ?? null), final: b === 'final' ? v : (state.final[t] ?? null) }).catch(oops);
+    return;
+  }
+  if (v == null) delete state[b][t]; else state[b][t] = v;
   if (b === 'scores') { // clear stale final scores for teams no longer qualified
     const q = qualifiers().filter(Boolean).map(x => x.id);
     Object.keys(state.final).forEach(k => { if (!q.includes(k)) delete state.final[k]; });
@@ -362,12 +404,23 @@ document.addEventListener('change', e => {
 $('shuffleBtn').onclick = () => {
   if (Object.keys(state.scores).length && !confirm('Scores exist. Shuffle anyway? Scores will be cleared.')) return;
   state.order = state.order.map(v => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(v => v[1]);
+  if (db) {
+    state.order.forEach((id, i) => db.doc('teams/' + id).update({ order: i }).catch(oops));
+    Object.keys(raw.scores).forEach(id => db.doc('scores/' + id).delete().catch(oops));
+    return;
+  }
   state.scores = {}; state.final = {};
   save(); render();
 };
 $('resetBtn').onclick = () => {
   if (!confirm('Wipe every name, team and score?')) return;
-  state = { teams: [], order: [], scores: {}, final: {} };
+  if (db) {
+    raw.teams.forEach(t => db.doc('teams/' + t.id).delete().catch(oops));
+    raw.players.forEach(p => db.doc('players/' + p.id).delete().catch(oops));
+    Object.keys(raw.scores).forEach(id => db.doc('scores/' + id).delete().catch(oops));
+    return;
+  }
+  state = blank();
   save(); render();
 };
 $('exportBtn').onclick = async () => {
