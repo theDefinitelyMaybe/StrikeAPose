@@ -101,6 +101,10 @@ input:focus,select:focus{outline:none;border-color:var(--pink);box-shadow:0 0 0 
 .e-row label{margin-top:10px}
 .e-actions{display:flex;gap:10px;margin-top:14px}
 .e-actions .btn{flex:1}
+.dlg{position:fixed;inset:0;background:rgba(28,6,51,.7);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
+.dlg-box{background:var(--card);border-radius:18px;padding:18px;max-width:420px;width:100%;box-shadow:0 6px 0 var(--pink)}
+.dlg-box p{margin:0 0 6px;font-weight:700;font-size:17px}
+.dlg-box textarea{width:100%;font:500 14px Inter,sans-serif;border:2px solid var(--line);border-radius:12px;padding:10px;margin-top:8px}
 .tools{display:flex;flex-wrap:wrap;gap:10px}
 .hint{font-size:14px;color:var(--muted);margin:4px 0 0}
 footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
@@ -327,6 +331,25 @@ function sideHTML(t, winner, bucket, note){
   </div>`;
 }
 
+/* ---------- in-page dialogs (browser pop-ups are blocked when the page is embedded) ---------- */
+function showDialog(text, body, buttons){
+  return new Promise(res => {
+    const d = document.createElement('div');
+    d.className = 'dlg';
+    d.innerHTML = `<div class="dlg-box" role="dialog" aria-modal="true"><p>${esc(text)}</p>
+      ${body != null ? `<textarea readonly rows="8">${esc(body)}</textarea>` : ''}
+      <div class="e-actions">${buttons.map(([l, v, danger], i) => `<button class="btn ${v ? (danger ? 'danger' : '') : 'ghost'}" data-dlg="${i}">${esc(l)}</button>`).join('')}</div></div>`;
+    d.addEventListener('click', e => {
+      const i = e.target.dataset.dlg;
+      if (i == null && e.target !== d) return;
+      e.stopPropagation(); d.remove(); res(i == null ? false : buttons[i][1]);
+    });
+    document.body.appendChild(d);
+    const ta = d.querySelector('textarea'); if (ta) { ta.focus(); ta.select(); } else d.querySelector('button').focus();
+  });
+}
+const ask = (text, ok, danger) => showDialog(text, null, [['Cancel', false], [ok, true, danger]]);
+
 /* ---------- events ---------- */
 $('tpick').addEventListener('change', () => { $('newTeamWrap').hidden = $('tpick').value !== '__new'; });
 
@@ -416,7 +439,7 @@ function saveEditor(id){
   editing = null; render();
 }
 
-document.addEventListener('click', e => {
+document.addEventListener('click', async e => {
   const d = e.target.dataset;
   if (d.edit) { if (editing) { editing = null; render(); } return openEditor(d.edit); }
   if (d.save) return saveEditor(d.save);
@@ -424,7 +447,7 @@ document.addEventListener('click', e => {
   const rm = d.rm;
   if (!rm) return;
   const [id, i] = rm.split(':'), t = team(id);
-  if (!confirm(`Remove ${t.members[i]} from ${t.name}?`)) return;
+  if (!await ask(`Remove ${t.members[i]} from ${t.name}?`, 'Remove')) return;
   if (db) {
     const pid = t.pids[i];
     if (pid) db.doc('players/' + pid).delete().catch(oops);
@@ -454,8 +477,8 @@ document.addEventListener('change', e => {
   save(); render();
 });
 
-$('shuffleBtn').onclick = () => {
-  if (!confirm('Randomly reassign every team to a lane? All scores will be cleared.')) return;
+$('shuffleBtn').onclick = async () => {
+  if (!await ask('Randomly reassign every team to a lane? All scores will be cleared.', 'Shuffle')) return;
   const ids = state.teams.map(t => [Math.random(), t]).sort((a, b) => a[0] - b[0]).map(v => v[1]);
   ids.forEach((t, i) => { t.lane = Math.floor(i / PER_LANE) + 1; });
   if (db) {
@@ -466,8 +489,8 @@ $('shuffleBtn').onclick = () => {
   state.scores = {}; state.final = {}; state.third = {};
   save(); render();
 };
-$('resetBtn').onclick = () => {
-  if (!confirm('Wipe every name, team and score?')) return;
+$('resetBtn').onclick = async () => {
+  if (!await ask('Wipe every name, team and score? This can’t be undone.', 'Reset everything', true)) return;
   if (db) {
     raw.teams.forEach(t => db.doc('teams/' + t.id).delete().catch(oops));
     raw.players.forEach(p => db.doc('players/' + p.id).delete().catch(oops));
@@ -488,8 +511,9 @@ $('exportBtn').onclick = async () => {
     if (br && br !== 'tie') out.push(`🥉 3rd place: ${br.name}`);
   }
   const txt = out.join('\n');
-  try { await navigator.clipboard.writeText(txt); alert('Copied! Go brag in the group chat.'); }
-  catch { prompt('Copy this:', txt); }
+  let copied = false;
+  try { await navigator.clipboard.writeText(txt); copied = true; } catch (e) {}
+  showDialog(copied ? 'Copied! Go brag in the group chat. 💅' : 'Press and hold to copy, then paste in the group chat:', txt, [['Done', false]]);
 };
 
 render();
