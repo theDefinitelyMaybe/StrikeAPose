@@ -13,6 +13,7 @@
   --ink:#1c0633; --card:#fffaf2; --muted:#6b5a7b; --line:#e6d9f5; --red:#e5484d; --green:#1a9c5b;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0}
 body{
   font-family:Inter,system-ui,sans-serif; color:var(--ink); min-height:100vh; padding-bottom:40px;
@@ -108,6 +109,8 @@ input:focus,select:focus{outline:none;border-color:var(--pink);box-shadow:0 0 0 
 .warn{margin:8px 0 0;font-size:14px;font-weight:700;color:#a3125e}
 .danger-link{color:var(--red);margin-top:12px}
 .side input.bad{border-color:var(--red);box-shadow:0 0 0 3px rgba(229,72,77,.25)}
+.lock{display:flex;gap:10px}
+.lock input{flex:1;min-width:0;letter-spacing:6px;text-align:center}
 .tools{display:flex;flex-wrap:wrap;gap:10px}
 .hint{font-size:14px;color:var(--muted);margin:4px 0 0}
 footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
@@ -149,7 +152,7 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
 
   <section class="card">
     <h2>🎳 Round 1 · The Lanes</h2>
-    <p class="hint">Enter each team's <b>final total score</b>. Typo? Just tap the score and fix it — clear it to start over. Each lane winner is in the running; the <b>two highest-scoring lane winners</b> go to the Championship.</p>
+    <p class="hint">Enter each team's <b>combined total</b>: add up every bowler's final game score (e.g. 142 + 118 + 165 = <b>425</b>). Higher team total wins the lane. The <b>two lane winners with the highest totals</b> go to the Championship. Typo? Tap the score and fix it.</p>
     <div id="lanes"></div>
   </section>
 
@@ -161,7 +164,13 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
 
   <section class="card">
     <h2>🧰 Host Tools</h2>
-    <div class="tools">
+    <form id="lockForm" class="lock" autocomplete="off">
+      <input id="pin" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]*" placeholder="Host PIN" aria-label="Host PIN">
+      <button class="btn ghost" type="submit">🔒 Unlock</button>
+    </form>
+    <div class="msg err" id="pinMsg"></div>
+    <div class="tools" id="hostTools" hidden>
+      <button class="btn ghost" id="lockBtn">🔓 Lock</button>
       <button class="btn ghost" id="exportBtn">Copy results</button>
       <button class="btn ghost" id="shuffleBtn">Shuffle lanes</button>
       <button class="btn ghost danger" id="resetBtn">Reset everything</button>
@@ -343,7 +352,7 @@ function sideHTML(t, winner, bucket, note){
   const win = winner && winner !== 'tie' && winner.id === t.id;
   return `<div class="side ${win ? 'win' : ''}">
     <div class="who"><b>${esc(t.name)}${bucket !== 'scores' ? ` <span class="lane-tag l${t.lane}">Lane ${t.lane}</span>` : ''}</b><small>${note ? esc(note) + ' · ' : ''}${t.members.map(esc).join(', ') || '—'}</small></div>
-    <input type="number" inputmode="numeric" min="0" max="900" placeholder="Score"
+    <input type="number" inputmode="numeric" min="0" max="900" placeholder="Team total"
       aria-label="${esc(t.name)} total score" step="1" data-b="${bucket}" data-t="${t.id}" value="${v ?? ''}">
   </div>`;
 }
@@ -368,6 +377,24 @@ function showDialog(text, body, buttons){
   });
 }
 const ask = (text, ok, danger) => showDialog(text, null, [['Cancel', false], [ok, true, danger]]);
+
+/* ---------- host lock (keeps party guests away from shuffle/reset; not bank-grade security) ---------- */
+const PIN_HASH = '1f5004fe';
+const hashPin = pin => { let h = 0x811c9dc5; for (const c of 'strikeapose:' + pin) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return h.toString(16); };
+let hostUnlocked = false;
+try { hostUnlocked = sessionStorage.getItem('sap.host') === PIN_HASH; } catch (e) {}
+function showHost(){ $('hostTools').hidden = !hostUnlocked; $('lockForm').hidden = hostUnlocked; }
+$('lockForm').addEventListener('submit', e => {
+  e.preventDefault();
+  if (hashPin($('pin').value.trim()) === PIN_HASH) {
+    hostUnlocked = true; $('pinMsg').textContent = '';
+    try { sessionStorage.setItem('sap.host', PIN_HASH); } catch (err) {}
+  } else $('pinMsg').textContent = 'Wrong PIN, darling. Host only.';
+  $('pin').value = ''; showHost();
+});
+$('lockBtn').onclick = () => { hostUnlocked = false; try { sessionStorage.removeItem('sap.host'); } catch (e) {} showHost(); };
+const hostOnly = () => hostUnlocked || (showHost(), false);
+showHost();
 
 /* ---------- events ---------- */
 $('tpick').addEventListener('change', () => { $('newTeamWrap').hidden = $('tpick').value !== '__new'; });
@@ -532,6 +559,7 @@ document.addEventListener('change', e => {
 });
 
 $('shuffleBtn').onclick = async () => {
+  if (!hostOnly()) return;
   if (!await ask('Randomly reassign every team to a lane? All scores will be cleared.', 'Shuffle')) return;
   editing = null;
   const ids = state.teams.map(t => [Math.random(), t]).sort((a, b) => a[0] - b[0]).map(v => v[1]);
@@ -544,6 +572,7 @@ $('shuffleBtn').onclick = async () => {
   save(); render();
 };
 $('resetBtn').onclick = async () => {
+  if (!hostOnly()) return;
   if (!await ask('Wipe every name, team and score? This can’t be undone.', 'Reset everything', true)) return;
   if (db) {
     raw.teams.forEach(t => db.doc('teams/' + t.id).delete().catch(oops));
