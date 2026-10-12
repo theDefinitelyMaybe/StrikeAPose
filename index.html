@@ -111,6 +111,10 @@ input:focus,select:focus{outline:none;border-color:var(--pink);box-shadow:0 0 0 
 .side input.bad{border-color:var(--red);box-shadow:0 0 0 3px rgba(229,72,77,.25)}
 .lock{display:flex;gap:10px}
 .lock input{flex:1;min-width:0;letter-spacing:6px;text-align:center}
+.name-form{display:flex;gap:8px;margin-top:10px}
+.name-form input{flex:1;min-width:0;min-height:46px;padding:10px 12px}
+.name-form .btn{min-height:46px;padding:10px 16px;font-size:14px}
+.team .muted{color:var(--muted);font-weight:600}
 .tools{display:flex;flex-wrap:wrap;gap:10px}
 .hint{font-size:14px;color:var(--muted);margin:4px 0 0}
 footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
@@ -125,28 +129,9 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
     <p class="sub">The Birthday Bowl-Off · The Gutter, LIC · Sun Oct 18</p>
   </header>
 
-  <section class="card" id="signup">
-    <h2>✍️ Sign Up</h2>
-    <div class="meter"><span id="headcount">0 / 18</span><div class="bar"><i id="headbar" style="width:0"></i></div></div>
-    <p class="hint">3 lanes · 2 teams per lane · 2–3 bowlers per team.</p>
-    <form id="joinForm" autocomplete="off">
-      <label for="pname">Your name</label>
-      <input id="pname" maxlength="30" placeholder="e.g. Disco Donna" required>
-      <label for="tpick">Your team</label>
-      <select id="tpick"></select>
-      <div id="newTeamWrap">
-        <label for="tname">New team name</label>
-        <input id="tname" maxlength="30" placeholder="e.g. Gutter Glamazons">
-        <label for="lpick">Pick your lane</label>
-        <select id="lpick"></select>
-      </div>
-      <button class="btn full" type="submit">Strike a Pose 💅</button>
-      <div class="msg" id="joinMsg" role="status"></div>
-    </form>
-  </section>
-
   <section class="card">
-    <h2>👯 The Teams <span class="tag" id="teamCount">0 / 6</span></h2>
+    <h2>👯 The Teams</h2>
+    <p class="hint">Teams and lanes are set. Find your squad and <b>give it a fabulous name</b>. Any teammate can name it, and you can change it until the first ball is thrown.</p>
     <div class="teams" id="teamList"></div>
   </section>
 
@@ -172,9 +157,10 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
     <div class="tools" id="hostTools" hidden>
       <button class="btn ghost" id="lockBtn">🔓 Lock</button>
       <button class="btn ghost" id="exportBtn">Copy results</button>
-      <button class="btn ghost" id="shuffleBtn">Shuffle lanes</button>
-      <button class="btn ghost danger" id="resetBtn">Reset everything</button>
+      <button class="btn ghost danger" id="resetScoresBtn">Clear all scores</button>
+      <button class="btn ghost danger" id="resetBtn">Reset names &amp; scores</button>
     </div>
+    <div class="msg err" id="saveMsg" role="status"></div>
     <p class="hint" id="syncNote">Saved on this device only. Pass the host's phone around the lanes to keep one scoreboard.</p>
   </section>
 
@@ -182,7 +168,16 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
 </div>
 
 <script>
-const LANES = 3, PER_LANE = 2, MAX_TEAMS = LANES * PER_LANE, MIN_T = 2, MAX_T = 3, KEY = 'strikeapose.v2';
+const LANES = 3, MAX_SCORE = 300, KEY = 'strikeapose.v3';
+// Pre-assigned teams. Lanes and bowlers are fixed; teams only choose their name.
+const ROSTER = [
+  { id: 'A', lane: 1, members: ['Ju', 'Albert', 'Andrew'] },
+  { id: 'B', lane: 1, members: ['Aaron', 'Kiet', 'Zeeshan'] },
+  { id: 'C', lane: 2, members: ['TJ', 'LQ', 'Ollie'] },
+  { id: 'D', lane: 2, members: ['Greg', 'Richard', 'James'] },
+  { id: 'E', lane: 3, members: ['Patryk', 'Ronald', 'Akram'] },
+  { id: 'F', lane: 3, members: ['Patrick', 'Jason', 'John'] }
+];
 const READS = [
   "Your form was giving… gutter.",
   "Those pins stood there longer than your career.",
@@ -191,76 +186,58 @@ const READS = [
   "The shoes have seen things, and they've never seen worse."
 ];
 const LANE_DOT = { 1: '🩷', 2: '💙', 3: '🧡' };
-const blank = () => ({ teams: [], scores: {}, final: {}, third: {} });
+const blank = () => ({ names: {}, scores: {}, final: {}, third: {} });
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const uid = () => Math.random().toString(36).slice(2, 9);
 let state = load(), db = null;
 
 function load(){
-  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.teams) return { ...blank(), ...s }; } catch(e){}
+  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.scores) return { ...blank(), ...s }; } catch(e){}
   return blank();
 }
 function save(){ if (!db) try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){} }
-const team = id => state.teams.find(t => t.id === id);
-const allNames = () => state.teams.flatMap(t => t.members.map(m => m.toLowerCase()));
+const defaultName = t => 'Team ' + t.id;
+const teams = () => ROSTER.map(r => ({ ...r, name: state.names[r.id] || defaultName(r), named: !!state.names[r.id] }));
+const team = id => teams().find(t => t.id === id);
 
 /* ---------- shared scoreboard (when opened as a shared page) ---------- */
-const raw = { teams: [], players: [], scores: {} };
+const raw = { names: {}, scores: {} };
 function rebuild(){
   const s = blank();
-  raw.teams.slice().sort((a, b) => a.order - b.order).forEach(t => {
-    const ps = raw.players.filter(p => p.team === t.id).sort((a, b) => a.created - b.created);
-    s.teams.push({ id: t.id, name: t.name, lane: t.lane, members: ps.map(p => p.name), pids: ps.map(p => p.id) });
-    const sc = raw.scores[t.id] || {};
-    for (const [k, f] of [['scores', 'r1'], ['final', 'final'], ['third', 'third']]) if (sc[f] != null) s[k][t.id] = sc[f];
-  });
+  for (const [id, d] of Object.entries(raw.names)) if (d.name) s.names[id] = d.name;
+  for (const [id, sc] of Object.entries(raw.scores))
+    for (const [k, f] of [['scores', 'r1'], ['final', 'final'], ['third', 'third']]) if (sc[f] != null) s[k][id] = sc[f];
   state = s; render();
 }
-const docs = snap => snap.docs.map(d => ({ id: d.id, ...d.data() }));
-const oops = e => { const m = $('joinMsg'); m.className = 'msg err';
-  m.textContent = e && e.code === 'not_granted' ? "You're view-only on this page — ask the host for edit access." : 'Could not save — check your connection and try again.'; };
+const byId = snap => Object.fromEntries(snap.docs.map(d => [d.id, d.data()]));
+const oops = e => { $('saveMsg').textContent = e && e.code === 'not_granted'
+  ? "You're view-only on this page — ask the host for edit access." : 'Could not save — check your connection and try again.'; };
 (async () => {
   if (!window.claude || !window.claude.use) return;
   const d = await window.claude.use('db');
   if (!d) return;
   db = d;
-  $('syncNote').textContent = '🟢 Live scoreboard — everyone with the link sees the same teams and scores.';
-  db.collection('teams').onSnapshot(q => { raw.teams = docs(q); rebuild(); });
-  db.collection('players').onSnapshot(q => { raw.players = docs(q); rebuild(); });
-  db.collection('scores').onSnapshot(q => { raw.scores = Object.fromEntries(docs(q).map(x => [x.id, x])); rebuild(); });
+  $('syncNote').textContent = '🟢 Live scoreboard — everyone with the link sees the same names and scores.';
+  db.collection('names').onSnapshot(q => { raw.names = byId(q); rebuild(); });
+  db.collection('scores').onSnapshot(q => { raw.scores = byId(q); rebuild(); });
 })();
 
 /* ---------- tournament logic ---------- */
-function lanes(){
-  const out = Array.from({ length: LANES }, () => []);
-  state.teams.forEach(t => { const l = t.lane - 1; if (out[l] && out[l].length < PER_LANE) out[l].push(t); });
-  return out.map(l => [l[0] || null, l[1] || null]);
-}
-// teams that couldn't get a lane slot (e.g. two phones grabbed the last spot at the same moment)
-const benched = () => { const placed = lanes().flat(); return state.teams.filter(t => !placed.includes(t)); };
-const openLanes = () => lanes().map((p, i) => ({ n: i + 1, used: p.filter(Boolean).length })).filter(l => l.used < PER_LANE);
-function best(teams, bucket){ // unique top scorer among teams, 'tie', or null if scores missing
-  if (!teams.length || teams.some(t => !t || state[bucket][t.id] == null)) return null;
-  const max = Math.max(...teams.map(t => state[bucket][t.id]));
-  const tops = teams.filter(t => state[bucket][t.id] === max);
+const lanes = () => [1, 2, 3].map(n => teams().filter(t => t.lane === n));
+function best(ts, bucket){ // unique top scorer, 'tie', or null if any score is missing
+  if (!ts.length || ts.some(t => state[bucket][t.id] == null)) return null;
+  const max = Math.max(...ts.map(t => state[bucket][t.id]));
+  const tops = ts.filter(t => state[bucket][t.id] === max);
   return tops.length === 1 ? tops[0] : 'tie';
 }
-const laneWinner = pair => {
-  const ts = pair.filter(Boolean);
-  if (!ts.length) return null;
-  const w = best(ts, 'scores'); // a team alone on a lane advances once its score is in (a bye)
-  return w === 'tie' ? null : w;
-};
+const laneWinner = pair => { const w = best(pair, 'scores'); return w === 'tie' ? null : w; };
 function round2(){
   const winners = lanes().map(laneWinner);
-  const empty = lanes().map((p, i) => p[0] ? 0 : i + 1).filter(Boolean);
-  if (empty.length) return { ready: false, empty };
   if (winners.some(w => !w)) return { ready: false, done: winners.filter(Boolean).length };
   const ranked = winners.slice().sort((a, b) => state.scores[b.id] - state.scores[a.id]);
   if (state.scores[ranked[1].id] === state.scores[ranked[2].id]) return { ready: false, tie: [ranked[1], ranked[2]] };
-  const finalists = ranked.slice(0, 2);
-  return { ready: true, finalists, bronze: state.teams.filter(t => !finalists.includes(t)) };
+  const ids = ranked.slice(0, 2).map(t => t.id);
+  return { ready: true, finalists: ranked.slice(0, 2), bronze: teams().filter(t => !ids.includes(t.id)) };
 }
 
 /* ---------- render ---------- */
@@ -268,45 +245,19 @@ let rendering = false;
 function render(){
   if (rendering) return; rendering = true;
   const fa = document.activeElement, keep = fa && fa.dataset && fa.dataset.t ? `input[data-b="${fa.dataset.b}"][data-t="${fa.dataset.t}"]` : null;
-  const people = state.teams.reduce((n, t) => n + t.members.length, 0);
-  $('headcount').textContent = `${people} / ${MAX_TEAMS * MAX_T}`;
-  $('headbar').style.width = (people / (MAX_TEAMS * MAX_T) * 100) + '%';
-  $('teamCount').textContent = `${state.teams.length} / ${MAX_TEAMS}`;
 
-  // team + lane pickers
-  const open = state.teams.filter(t => t.members.length < MAX_T);
-  const prev = $('tpick').value, prevL = $('lpick').value;
-  $('tpick').innerHTML = '<option value="">Choose your team…</option>' +
-    (state.teams.length < MAX_TEAMS ? '<option value="__new">✨ Start a new team</option>' : '') +
-    open.map(t => `<option value="${t.id}">${LANE_DOT[t.lane]} ${esc(t.name)} · Lane ${t.lane} (${t.members.length}/${MAX_T})</option>`).join('');
-  if ([...$('tpick').options].some(o => o.value === prev)) $('tpick').value = prev;
-  if ($('tpick').options.length === 1) $('tpick').innerHTML = '<option value="">Every team is full, darling</option>';
-  $('newTeamWrap').hidden = $('tpick').value !== '__new';
-  $('lpick').innerHTML = '<option value="">Choose a lane…</option>' + openLanes().map(l =>
-    `<option value="${l.n}">${LANE_DOT[l.n]} Lane ${l.n} — ${l.used ? '1 spot left (vs ' + esc(lanes()[l.n-1][0].name) + ')' : 'open'}</option>`).join('');
-  if ([...$('lpick').options].some(o => o.value === prevL)) $('lpick').value = prevL;
-
-  // team list (left alone while someone is mid-edit so live updates don't wipe their changes)
-  if (editing && !team(editing)) editing = null;
-  const bench = benched();
-  if (!editing) $('teamList').innerHTML = state.teams.length ? state.teams.slice().sort((a, b) => (a.lane || 9) - (b.lane || 9)).map(t => {
-    const n = t.members.length, cls = n < MIN_T || n > MAX_T ? 'low' : n === MAX_T ? 'full' : 'ok';
-    const lbl = n > MAX_T ? `${n}/${MAX_T} · too many!` : n < MIN_T ? `${n}/${MAX_T} · need ${MIN_T - n} more` : n === MAX_T ? 'FULL' : `${n}/${MAX_T}`;
-    const warn = bench.includes(t) ? `<p class="warn">⚠️ Lane ${t.lane || '?'} is already full, so this team isn't playing yet. Tap Edit team to pick another lane.</p>`
-      : n > MAX_T ? `<p class="warn">⚠️ Max ${MAX_T} bowlers per team. Tap Edit team to move someone.</p>` : '';
-    return `<div class="team l${t.lane}">
-      <div class="team-head"><span class="team-name">${esc(t.name)} <span class="lane-tag l${t.lane}">${LANE_DOT[t.lane] || ''} Lane ${t.lane || '?'}</span></span><span class="count ${cls}">${lbl}</span></div>
-      ${warn}
-      <button class="edit-btn" data-edit="${t.id}">✏️ Edit team</button>
-      <div class="chips">${t.members.map((m, i) =>
-        `<span class="chip">${esc(m)}<button aria-label="Remove ${esc(m)}" data-rm="${t.id}:${i}">×</button></span>`).join('')}</div>
-    </div>`;
-  }).join('') : '<p class="empty">No teams yet. Be the first to strike a pose.</p>';
+  // team cards; a card someone is typing a name into is left alone so live updates don't wipe it
+  const typing = fa && fa.classList && fa.classList.contains('tname') ? fa.dataset.id : null;
+  if (!typing) $('teamList').innerHTML = teams().map(teamCard).join('');
+  else teams().forEach(t => {
+    const c = $('teamList').querySelector(`.team[data-id="${t.id}"]`);
+    if (c && t.id !== typing) c.outerHTML = teamCard(t);
+  });
 
   // round 1
   $('lanes').innerHTML = lanes().map((pair, i) => {
-    const w = laneWinner(pair), tied = pair[0] && pair[1] && best(pair, 'scores') === 'tie';
-    const status = !pair[0] ? 'Waiting for teams' : w ? (pair[1] ? 'Winner in!' : 'Solo — advances') : tied ? 'Tie! Roll-off +1' : !pair[1] ? 'Solo lane' : 'In play';
+    const w = laneWinner(pair), tied = best(pair, 'scores') === 'tie';
+    const status = w ? 'Winner in!' : tied ? 'Tie! Roll-off +1' : 'In play';
     return `<div class="lane l${i+1}">
       <div class="lane-title">${LANE_DOT[i+1]} Lane ${i+1}<span class="status">${status}</span></div>
       ${sideHTML(pair[0], w, 'scores')}
@@ -319,13 +270,12 @@ function render(){
   const r2 = round2();
   if (!r2.ready) {
     $('final').innerHTML = `<p class="empty">${r2.tie
-      ? `${esc(r2.tie[0].name)} and ${esc(r2.tie[1].name)} tied for the last Championship spot. Bowl a roll-off, then add 1 to the winner's Round 1 score.`
-      : r2.empty ? `Lane ${r2.empty.join(' & ')} still ${r2.empty.length > 1 ? 'have' : 'has'} no team. Every lane needs at least one team before Round 2.`
+      ? `${esc(r2.tie[0].name)} and ${esc(r2.tie[1].name)} tied for the last Championship spot. Bowl a roll-off, then add 1 to the winner's Round 1 total.`
       : `Waiting on Round 1 — ${r2.done}/3 lane winners in.`}</p>`;
   } else {
     const ch = best(r2.finalists, 'final'), br = best(r2.bronze, 'third');
-    const runner = ch && ch !== 'tie' ? r2.finalists.find(t => t !== ch) : null;
-    const lost = br && br !== 'tie' ? r2.bronze.filter(t => t !== br) : [];
+    const runner = ch && ch !== 'tie' ? r2.finalists.find(t => t.id !== ch.id) : null;
+    const lost = br && br !== 'tie' ? r2.bronze.filter(t => t.id !== br.id) : [];
     $('final').innerHTML = `
       <div class="lane">
         <div class="lane-title">🏆 Championship<span class="status">${ch === 'tie' ? 'Tie! Roll-off' : ch ? 'Crowned!' : 'In play'}</span></div>
@@ -346,14 +296,26 @@ function render(){
   if (keep) { const el = document.querySelector(keep); if (el) el.focus(); }
 }
 
+function teamCard(t){
+  return `<div class="team l${t.lane}" data-id="${t.id}">
+    <div class="team-head"><span class="team-name">${esc(t.name)}</span><span class="lane-tag l${t.lane}">${LANE_DOT[t.lane]} Lane ${t.lane}</span></div>
+    ${t.named ? `<small class="muted">${defaultName(t)}</small>` : ''}
+    <div class="chips">${t.members.map(m => `<span class="chip">${esc(m)}</span>`).join('')}</div>
+    <form class="name-form" data-id="${t.id}" autocomplete="off">
+      <input class="tname" data-id="${t.id}" maxlength="30" placeholder="Name ${defaultName(t)}…" value="${t.named ? esc(t.name) : ''}" aria-label="Team name for ${defaultName(t)}">
+      <button class="btn" type="submit">${t.named ? 'Rename' : 'Save'}</button>
+    </form>
+    <div class="msg err" data-err="${t.id}"></div>
+  </div>`;
+}
+
 function sideHTML(t, winner, bucket, note){
-  if (!t) return `<div class="side"><div class="who"><b>Open slot</b><small>Sign up a team</small></div><div></div></div>`;
   const v = state[bucket][t.id];
   const win = winner && winner !== 'tie' && winner.id === t.id;
   return `<div class="side ${win ? 'win' : ''}">
-    <div class="who"><b>${esc(t.name)}${bucket !== 'scores' ? ` <span class="lane-tag l${t.lane}">Lane ${t.lane}</span>` : ''}</b><small>${note ? esc(note) + ' · ' : ''}${t.members.map(esc).join(', ') || '—'}</small></div>
-    <input type="number" inputmode="numeric" min="0" max="900" placeholder="Team total"
-      aria-label="${esc(t.name)} total score" step="1" data-b="${bucket}" data-t="${t.id}" value="${v ?? ''}">
+    <div class="who"><b>${esc(t.name)}${bucket !== 'scores' ? ` <span class="lane-tag l${t.lane}">Lane ${t.lane}</span>` : ''}</b><small>${note ? esc(note) + ' · ' : ''}${t.members.map(esc).join(', ')}</small></div>
+    <input type="number" inputmode="numeric" min="0" max="${t.members.length * MAX_SCORE}" step="1" placeholder="Total"
+      aria-label="${esc(t.name)} total score" data-b="${bucket}" data-t="${t.id}" value="${v ?? ''}">
   </div>`;
 }
 
@@ -378,7 +340,7 @@ function showDialog(text, body, buttons){
 }
 const ask = (text, ok, danger) => showDialog(text, null, [['Cancel', false], [ok, true, danger]]);
 
-/* ---------- host lock (keeps party guests away from shuffle/reset; not bank-grade security) ---------- */
+/* ---------- host lock (keeps party guests away from resets; not bank-grade security) ---------- */
 const PIN_HASH = '1f5004fe';
 const hashPin = pin => { let h = 0x811c9dc5; for (const c of 'strikeapose:' + pin) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return h.toString(16); };
 let hostUnlocked = false;
@@ -397,154 +359,33 @@ const hostOnly = () => hostUnlocked || (showHost(), false);
 showHost();
 
 /* ---------- events ---------- */
-$('tpick').addEventListener('change', () => { $('newTeamWrap').hidden = $('tpick').value !== '__new'; });
-
-$('joinForm').addEventListener('submit', e => {
+// naming a team
+document.addEventListener('submit', e => {
+  const f = e.target.closest('.name-form');
+  if (!f) return;
   e.preventDefault();
-  const msg = $('joinMsg'), name = $('pname').value.trim(), pick = $('tpick').value;
-  const fail = s => { msg.className = 'msg err'; msg.textContent = s; };
-  if (!name) return fail('Name, please. We need to know who to read.');
-  if (allNames().includes(name.toLowerCase())) return fail(`There's already a ${name} signed up. Add a last initial (e.g. ${name} B.) so we can tell you apart.`);
-  if (!pick) return fail('Choose your team — or start a new one.');
-  let t;
-  if (pick === '__new') {
-    const tn = $('tname').value.trim(), lane = +$('lpick').value;
-    if (!tn) return fail('Give your team a fabulous name.');
-    if (state.teams.some(x => x.name.toLowerCase() === tn.toLowerCase())) return fail('That team name is taken — pick it from the list to join.');
-    if (!lane) return fail('Pick a lane, superstar.');
-    if (!openLanes().some(l => l.n === lane)) return fail(`Lane ${lane} is full — pick another.`);
-    t = { id: uid(), name: tn, lane, members: [], pids: [] };
-    if (db) db.doc('teams/' + t.id).set({ name: tn, lane, order: Date.now() }).catch(oops);
-    state.teams.push(t);
-  } else {
-    t = team(pick);
-    if (!t) return fail('Pick a team.');
-    if (t.members.length >= MAX_T) return fail('That team is full (3 max).');
-  }
-  const pid = uid();
-  if (db) db.doc('players/' + pid).set({ name, team: t.id, created: Date.now() }).catch(oops);
-  t.members.push(name); t.pids.push(pid); save(); // shown right away; the live scoreboard confirms it
-  $('tpick').value = ''; render();
-  $('pname').value = ''; $('tname').value = ''; $('lpick').value = '';
-  msg.className = 'msg ok';
-  msg.textContent = t.members.length < MIN_T ? `${name} is on ${t.name} (Lane ${t.lane})! Recruit one more bowler.` : `${name} joined ${t.name} on Lane ${t.lane}. Work! 💃`;
+  const id = f.dataset.id, t = team(id), input = f.querySelector('.tname'), err = document.querySelector(`[data-err="${id}"]`);
+  const name = input.value.trim().replace(/\s+/g, ' ');
+  if (!name) { err.textContent = 'Type a name first, superstar.'; return input.focus(); }
+  if (teams().some(x => x.id !== id && x.name.toLowerCase() === name.toLowerCase())) { err.textContent = 'Another team already has that name. Be original, darling.'; return input.focus(); }
+  if (/^team [a-f]$/i.test(name) && name.toUpperCase() !== defaultName(t).toUpperCase()) { err.textContent = 'That looks like another team\'s placeholder. Pick something fabulous.'; return input.focus(); }
+  err.textContent = '';
+  if (db) db.doc('names/' + id).set({ name }).catch(oops);
+  state.names[id] = name; save();
+  input.blur(); render();
+  const c = document.querySelector(`.team[data-id="${id}"] .msg`); if (c) { c.className = 'msg ok'; c.textContent = `Saved! You are now ${name}. 💅`; }
 });
 
-/* ---------- edit a team: rename, change lane, fix names, move bowlers ---------- */
-let editing = null, confirmLane = false;
-function deleteTeam(t){
-  if (db) {
-    t.pids.forEach(pid => db.doc('players/' + pid).delete().catch(oops));
-    db.doc('teams/' + t.id).delete().catch(oops); db.doc('scores/' + t.id).delete().catch(oops);
-  }
-  state.teams = state.teams.filter(x => x !== t);
-  delete state.scores[t.id]; delete state.final[t.id]; delete state.third[t.id];
-  save();
-}
-function openEditor(id){
-  confirmLane = false;
-  const t = team(id), card = document.querySelector(`[data-edit="${id}"]`).closest('.team');
-  editing = id;
-  const laneOpts = [1, 2, 3].filter(n => n === t.lane || state.teams.filter(x => x.lane === n && x !== t).length < PER_LANE)
-    .map(n => `<option value="${n}" ${n === t.lane ? 'selected' : ''}>${LANE_DOT[n]} Lane ${n}</option>`).join('')
-    || '<option value="">No lane has room — delete or move another team first</option>';
-  const teamOpts = cur => state.teams.map(x => `<option value="${x.id}" ${x.id === cur ? 'selected' : ''}>${esc(x.name)}</option>`).join('');
-  card.classList.add('editing');
-  card.innerHTML = `
-    <label>Team name</label><input class="e-name" maxlength="30" value="${esc(t.name)}">
-    <label>Lane</label><select class="e-lane">${laneOpts}</select>
-    ${t.members.map((m, i) => `<div class="e-row">
-      <div><label>Bowler ${i+1}</label><input class="e-pname" data-i="${i}" maxlength="30" value="${esc(m)}"></div>
-      <div><label>Team</label><select class="e-pteam" data-i="${i}">${teamOpts(t.id)}</select></div>
-    </div>`).join('')}
-    <div class="e-actions"><button class="btn" data-save="${id}">Save</button><button class="btn ghost" data-cancel="1">Cancel</button></div>
-    <div class="msg err e-msg"></div>
-    <button class="edit-btn danger-link" data-delteam="${id}">🗑 Delete this whole team</button>`;
-  card.querySelector('.e-name').focus();
-}
-function saveEditor(id){
-  const t = team(id), card = document.querySelector('.team.editing'), err = s => { card.querySelector('.e-msg').textContent = s; };
-  if (!t) { editing = null; return render(); }
-  const name = card.querySelector('.e-name').value.trim(), lane = +card.querySelector('.e-lane').value;
-  if (!lane) return err('Pick a lane with room.');
-  const hadScores = state.scores[id] != null && lane !== t.lane;
-  const pnames = [...card.querySelectorAll('.e-pname')].map(x => x.value.trim());
-  const pteams = [...card.querySelectorAll('.e-pteam')].map(x => x.value);
-  if (!name) return err('Your team needs a name.');
-  if (state.teams.some(x => x !== t && x.name.toLowerCase() === name.toLowerCase())) return err('Another team already has that name.');
-  if (state.teams.filter(x => x !== t && x.lane === lane).length >= PER_LANE) return err(`Lane ${lane} is full.`);
-  if (pnames.some(n => !n)) return err('Bowler names can’t be blank — use × to remove someone instead.');
-  const others = state.teams.filter(x => x !== t).flatMap(x => x.members.map(m => m.toLowerCase()));
-  const lower = pnames.map(n => n.toLowerCase());
-  if (lower.some((n, i) => others.includes(n) || lower.indexOf(n) !== i)) return err('Two bowlers can’t share a name.');
-  for (const x of state.teams) if (x !== t) {
-    const incoming = pteams.filter(v => v === x.id).length;
-    if (x.members.length + incoming > MAX_T) return err(`${x.name} would have more than ${MAX_T} bowlers.`);
-  }
-  const staying = pteams.filter(v => v === id).length;
-  if (hadScores && !confirmLane) { confirmLane = true; return err('Heads up: this team already has a score. Changing lanes changes who it played against. Tap Save again to confirm.'); }
-  confirmLane = false;
-  if (db) {
-    if (staying) db.doc('teams/' + id).update({ name, lane }).catch(oops);
-    t.pids.forEach((pid, i) => db.doc('players/' + pid).update({ name: pnames[i], team: pteams[i] }).catch(oops));
-    if (!staying) { db.doc('teams/' + id).delete().catch(oops); db.doc('scores/' + id).delete().catch(oops); }
-  } else {
-    t.name = name; t.lane = lane;
-    const moved = [];
-    t.members.forEach((m, i) => { if (pteams[i] !== id) moved.push(i); else t.members[i] = pnames[i]; });
-    moved.reverse().forEach(i => {
-      const dest = team(pteams[i]); dest.members.push(pnames[i]); dest.pids.push(t.pids[i]);
-      t.members.splice(i, 1); t.pids.splice(i, 1);
-    });
-    if (!t.members.length) { state.teams = state.teams.filter(x => x !== t); delete state.scores[id]; delete state.final[id]; delete state.third[id]; }
-    save();
-  }
-  editing = null; render();
-}
-
-document.addEventListener('click', async e => {
-  const d = e.target.dataset;
-  if (d.edit) { if (editing) { editing = null; render(); } return openEditor(d.edit); }
-  if (d.save) return saveEditor(d.save);
-  if (d.cancel) { editing = null; return render(); }
-  if (d.delteam) {
-    const t = team(d.delteam);
-    if (t && await ask(`Delete ${t.name} and its ${t.members.length} bowler(s) and scores?`, 'Delete team', true)) deleteTeam(t);
-    editing = null; return render();
-  }
-  const rm = d.rm;
-  if (!rm) return;
-  const [id, i0] = rm.split(':'); let i = +i0;
-  let t = team(id);
-  if (!t || t.members[i] == null) return render();
-  const who = t.members[i];
-  if (!await ask(`Remove ${who} from ${t.name}?`, 'Remove')) return;
-  t = team(id); // the live scoreboard may have changed while the dialog was open
-  if (!t) return render();
-  i = t.members.indexOf(who);
-  if (i < 0) return render();
-  if (db) {
-    const pid = t.pids[i];
-    if (pid) db.doc('players/' + pid).delete().catch(oops);
-    if (t.members.length === 1) { db.doc('teams/' + id).delete().catch(oops); db.doc('scores/' + id).delete().catch(oops); }
-  }
-  t.members.splice(i, 1); t.pids.splice(i, 1);
-  if (!t.members.length) {
-    state.teams = state.teams.filter(x => x !== t);
-    delete state.scores[id]; delete state.final[id]; delete state.third[id];
-  }
-  save(); render();
-});
-
+// scores
 document.addEventListener('change', e => {
   const { b, t } = e.target.dataset;
   if (!b || rendering) return;
   const tm = team(t);
-  if (!tm) return render();
-  const val = e.target.value.trim(), n = Number(val), max = Math.max(1, tm.members.length) * 300;
+  if (!tm) return;
+  const val = e.target.value.trim(), n = Number(val), max = tm.members.length * MAX_SCORE;
   if (val !== '' && (!Number.isInteger(n) || n < 0 || n > max)) {
     e.target.classList.add('bad');
-    showDialog(`${val} isn't a possible total for ${tm.name}. With ${tm.members.length} bowler(s) the max is ${max} (300 per person). Enter a whole number from 0 to ${max}.`, null, [['Fix it', false]])
+    showDialog(`${val} isn't a possible total for ${tm.name}. With ${tm.members.length} bowlers the max is ${max} (300 per person). Enter a whole number from 0 to ${max}.`, null, [['Fix it', false]])
       .then(() => { e.target.value = state[b][t] ?? ''; e.target.classList.remove('bad'); e.target.focus(); });
     return;
   }
@@ -558,35 +399,25 @@ document.addEventListener('change', e => {
   save(); render();
 });
 
-$('shuffleBtn').onclick = async () => {
+$('resetScoresBtn').onclick = async () => {
   if (!hostOnly()) return;
-  if (!await ask('Randomly reassign every team to a lane? All scores will be cleared.', 'Shuffle')) return;
-  editing = null;
-  const ids = state.teams.map(t => [Math.random(), t]).sort((a, b) => a[0] - b[0]).map(v => v[1]);
-  ids.forEach((t, i) => { t.lane = Math.floor(i / PER_LANE) + 1; });
-  if (db) {
-    ids.forEach(t => db.doc('teams/' + t.id).update({ lane: t.lane }).catch(oops));
-    Object.keys(raw.scores).forEach(id => db.doc('scores/' + id).delete().catch(oops));
-  }
-  state.scores = {}; state.final = {}; state.third = {};
+  if (!await ask('Clear every score in both rounds? Team names stay.', 'Clear scores', true)) return;
+  if (db) ROSTER.forEach(t => db.doc('scores/' + t.id).delete().catch(oops));
+  state = { ...blank(), names: state.names };
   save(); render();
 };
 $('resetBtn').onclick = async () => {
   if (!hostOnly()) return;
-  if (!await ask('Wipe every name, team and score? This can’t be undone.', 'Reset everything', true)) return;
-  if (db) {
-    raw.teams.forEach(t => db.doc('teams/' + t.id).delete().catch(oops));
-    raw.players.forEach(p => db.doc('players/' + p.id).delete().catch(oops));
-    Object.keys(raw.scores).forEach(id => db.doc('scores/' + id).delete().catch(oops));
-  }
-  editing = null;
+  if (!await ask('Wipe every team name and score? Teams go back to Team A–F. This can’t be undone.', 'Reset names & scores', true)) return;
+  if (db) ROSTER.forEach(t => { db.doc('scores/' + t.id).delete().catch(oops); db.doc('names/' + t.id).delete().catch(oops); });
   state = blank();
   save(); render();
 };
 $('exportBtn').onclick = async () => {
+  if (!hostOnly()) return;
   const r2 = round2(), line = (ts, b) => ts.map(t => `${t.name} ${state[b][t.id] ?? '–'}`).join(' vs ');
   const out = ['🎳 Strike a Pose, Spare No One — Results', '']
-    .concat(lanes().map((p, i) => `Lane ${i+1}: ` + p.map(t => t ? `${t.name} ${state.scores[t.id] ?? '–'}` : 'open').join(' vs ')));
+    .concat(lanes().map((p, i) => `Lane ${i+1}: ` + line(p, 'scores')));
   if (r2.ready) {
     out.push('', 'Championship: ' + line(r2.finalists, 'final'), '3rd place: ' + line(r2.bronze, 'third'));
     const ch = best(r2.finalists, 'final'), br = best(r2.bronze, 'third');
