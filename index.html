@@ -129,7 +129,7 @@ input:focus,select:focus{outline:none;border-color:var(--pink);box-shadow:0 0 0 
 .lm span{display:block;font-size:12px;font-weight:700;opacity:.95}
 .lm b{display:block;font-family:Bungee,sans-serif;font-size:13px}
 .lm small{font-size:11px;opacity:.9}
-.hint.center{text-align:center;margin-top:8px}
+.hint.center{text-align:center;margin-top:8px;font-size:13px}
 .team.done{padding:8px 12px}
 .team.done .team-head .edit-btn{margin:0 0 0 auto;text-decoration:none;font-size:18px;padding:2px 6px}
 .team.done .muted{display:block;font-size:13px;margin-top:2px}
@@ -142,6 +142,50 @@ input:focus,select:focus{outline:none;border-color:var(--pink);box-shadow:0 0 0 
 .tools{display:flex;flex-wrap:wrap;gap:10px}
 .hint{font-size:14px;color:var(--muted);margin:4px 0 0}
 footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
+/* ---------- polish ---------- */
+.msg:empty{display:none}
+.card h2{margin:0}
+.card > h2,.sec-toggle{margin-bottom:10px}
+.sec-toggle{all:unset;box-sizing:border-box;width:100%;display:flex;align-items:center;gap:8px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.sec-toggle:focus-visible{outline:3px solid var(--yellow);outline-offset:4px;border-radius:8px}
+.sec-toggle .chev{margin-left:auto;width:32px;height:32px;display:grid;place-items:center;border-radius:50%;background:var(--line);color:var(--plum);font-size:16px;transition:transform .2s}
+.sec-toggle[aria-expanded="false"] .chev{transform:rotate(-90deg)}
+.sec-toggle[aria-expanded="false"]{margin-bottom:0}
+.tag.all{background:#d9f7e7;color:var(--green)}
+#teamsBody .hint{margin:0 0 10px}
+.teams{gap:8px}
+.team.l1,.team.l2,.team.l3{border:0;padding:12px 14px 12px 20px;box-shadow:inset 6px 0 0 var(--lc),0 1px 2px rgba(28,6,51,.08),0 0 0 1px var(--line)}
+.team.l1.done,.team.l2.done,.team.l3.done{padding:10px 14px 10px 20px}
+.team-head{min-height:28px}
+.team-head .team-name{flex:1;min-width:0}
+.team-head .lane-tag{margin:0;flex:none}
+.team.done .team-head .edit-btn{margin:0;flex:none}
+.team.done .muted{margin-top:0}
+.chips{margin-top:6px}
+.name-form{margin-top:10px}
+.side{border-top:0;padding:10px 12px}
+.vs{display:flex;align-items:center;gap:10px;padding:0 12px;background:transparent;font-size:11px;line-height:1}
+.vs::before,.vs::after{content:"";flex:1;height:1px;background:var(--line)}
+.side small{line-height:1.35}
+.side small.grand{display:block;margin-top:2px;color:var(--ink);font-weight:600}
+.side small.grand b{display:inline;color:#c4126f;font-size:15px}
+.eq{align-items:stretch}
+.eq > b{align-self:center}
+.eq-box{display:flex;flex-direction:column;justify-content:center;white-space:nowrap}
+.eq-box.gold{font-size:13px}
+.lane-map{align-items:stretch}
+.lm{display:flex;flex-direction:column;justify-content:center}
+.flow span{display:flex;align-items:center;justify-content:center;align-self:stretch}
+.flow{align-items:stretch}
+.flow i{align-self:center}
+.lock input::placeholder{letter-spacing:normal}
+#syncNote{margin-top:12px}
+.dlg-box .e-actions{margin-top:14px}
+.team-sub{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px}
+.team-sub .muted{flex:1;min-width:0}
+.team.done .team-sub .edit-btn{margin:0;padding:2px 0;font-size:13px;text-decoration:none;white-space:nowrap;flex:none}
+.team.done .saved{flex:none}
+.warn{margin:6px 0 0;font-size:13px;font-weight:700;color:#a3125e}
 </style>
 </head>
 <body>
@@ -154,9 +198,13 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
   </header>
 
   <section class="card">
-    <h2>👯 The Teams</h2>
-    <p class="hint">Name your squad 👇 <span class="tag" id="namedCount">0/6 named</span></p>
-    <div class="teams" id="teamList"></div>
+    <button class="sec-toggle" id="teamsToggle" aria-expanded="true" aria-controls="teamsBody">
+      <h2>👯 The Teams</h2><span class="tag" id="namedCount">0/6 named</span><span class="chev" aria-hidden="true">▾</span>
+    </button>
+    <div id="teamsBody">
+      <p class="hint">Name your squad 👇</p>
+      <div class="teams" id="teamList"></div>
+    </div>
   </section>
 
   <section class="card">
@@ -166,7 +214,7 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
         <span class="eq-box">142<small>1st</small></span><b>+</b>
         <span class="eq-box">118<small>2nd</small></span><b>+</b>
         <span class="eq-box">165<small>3rd</small></span><b>=</b>
-        <span class="eq-box hot">425<small>you enter</small></span>
+        <span class="eq-box hot">425<small>you type</small></span>
       </div>
       <div class="flow">
         <span>👑 Win your lane</span><i>→</i>
@@ -182,7 +230,7 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
     <div class="howto">
       <div class="eq" aria-label="Round 1 total plus Round 2 game equals grand total">
         <span class="eq-box">Round 1<small>carried over</small></span><b>+</b>
-        <span class="eq-box hot">Round 2<small>you enter</small></span><b>=</b>
+        <span class="eq-box hot">Round 2<small>you type</small></span><b>=</b>
         <span class="eq-box gold">Grand total<small>highest wins</small></span>
       </div>
       <div class="lane-map">
@@ -190,7 +238,7 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
         <div class="lm l2"><span>💙 Lane 2</span><b id="lm2">3rd vs 4th</b><small>seed</small></div>
         <div class="lm l3"><span>🧡 Lane 3</span><b id="lm3">5th vs 6th</b><small>seed</small></div>
       </div>
-      <p class="hint center">🥉 Best grand total on Lanes 2 &amp; 3 takes bronze</p>
+      <p class="hint center">🥉 Best grand total on Lanes 2 &amp; 3 wins bronze</p>
     </div>
     <div id="final"></div>
   </section>
@@ -245,7 +293,13 @@ function load(){
 }
 function save(){ if (!db) try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){} }
 const defaultName = t => 'Team ' + t.id;
-const teams = () => ROSTER.map(r => ({ ...r, name: state.names[r.id] || defaultName(r), named: !!state.names[r.id] }));
+const teams = () => {
+  const ts = ROSTER.map(r => ({ ...r, name: state.names[r.id] || defaultName(r), named: !!state.names[r.id] }));
+  const key = t => t.name.toLowerCase();
+  const dupes = ts.filter(t => ts.some(x => x !== t && key(x) === key(t)));
+  dupes.forEach(t => { t.name += ` (${defaultName(t)})`; t.dupe = true; });
+  return ts;
+};
 const team = id => teams().find(t => t.id === id);
 
 /* ---------- shared scoreboard (when opened as a shared page) ---------- */
@@ -281,6 +335,8 @@ function best(ts, bucket){ // unique top total, 'tie', or null if any score is m
   const tops = ts.filter(t => score(t, bucket) === max);
   return tops.length === 1 ? tops[0] : 'tie';
 }
+const tiedNames = (ts, bucket) => { const max = Math.max(...ts.map(t => score(t, bucket)));
+  return ts.filter(t => score(t, bucket) === max).map(t => esc(t.name)).join(' & '); };
 const laneWinner = pair => { const w = best(pair, 'scores'); return w === 'tie' ? null : w; };
 function round2(){
   const winners = lanes().map(laneWinner);
@@ -303,10 +359,15 @@ let rendering = false;
 function render(){
   if (rendering) return; rendering = true;
   const fa = document.activeElement, keep = fa && fa.dataset && fa.dataset.t ? `input[data-b="${fa.dataset.b}"][data-t="${fa.dataset.t}"]` : null;
+  const draft = keep ? fa.value : null; // what this phone is mid-typing; live updates must not wipe it
 
   // team cards; a card someone is typing a name into is left alone so live updates don't wipe it
   const typing = fa && fa.classList && fa.classList.contains('tname') ? fa.dataset.id : null;
-  $('namedCount').textContent = `${teams().filter(t => t.named).length}/6 named`;
+  const named = teams().filter(t => t.named).length;
+  $('namedCount').textContent = `${named}/6 named`;
+  $('namedCount').classList.toggle('all', named === 6);
+  const open = teamsOpen ?? (named < 6 || renaming.size > 0); // collapses itself once every team is named, unless toggled
+  $('teamsBody').hidden = !open; $('teamsToggle').setAttribute('aria-expanded', open);
   if (!typing) $('teamList').innerHTML = teams().map(teamCard).join('');
   else teams().forEach(t => {
     const c = $('teamList').querySelector(`.team[data-id="${t.id}"]`);
@@ -346,6 +407,7 @@ function render(){
     const lost = br && br !== 'tie' ? r2.bronze.filter(t => t.id !== br.id) : [];
     $('final').innerHTML = `
       <h3 class="r2h">🏆 Championship</h3>
+      ${ch === 'tie' ? `<p class="swap">🎳 Tied for the crown! ${tiedNames(r2.finalists, 'final')} bowl a roll-off, then add 1 to the winner's Round 2 score.</p>` : ''}
       <div class="lane l1">
         <div class="lane-title">${LANE_DOT[1]} Lane 1<span class="status">${ch === 'tie' ? 'Tie! Roll-off' : ch ? 'Crowned!' : 'In play'}</span></div>
         ${sideHTML(r2.finalists[0], ch, 'final')}
@@ -353,6 +415,7 @@ function render(){
         ${sideHTML(r2.finalists[1], ch, 'final')}
       </div>
       <h3 class="r2h">🥉 3rd Place Showdown <span class="status">${br === 'tie' ? 'Tie! Roll-off' : br ? 'Bronze: ' + esc(br.name) : 'In play'}</span></h3>
+      ${br === 'tie' ? `<p class="swap">🎳 Tie for bronze! ${tiedNames(r2.bronze, 'third')} bowl a roll-off, then add 1 to the winner's Round 2 score.</p>` : ''}
       ${r2.swapped ? '<p class="swap">🔀 No rematches! Seeds shuffled so nobody faces their Round 1 opponent again.</p>' : ''}
       ${match(r2.pairs[0], 2)}${match(r2.pairs[1], 3)}` +
       (ch && ch !== 'tie' ? `<div class="champ">🪩 Champions 🪩<span class="big">${esc(ch.name)}</span>
@@ -364,23 +427,31 @@ function render(){
   $('lm2').textContent = sw ? '3rd vs 5th' : '3rd vs 4th';
   $('lm3').textContent = sw ? '4th vs 6th' : '5th vs 6th';
   rendering = false;
-  if (keep) { const el = document.querySelector(keep); if (el) el.focus(); }
+  if (keep) { const el = document.querySelector(keep); if (el) { el.value = draft; el.focus(); } }
 }
 
 const renaming = new Set(), flash = {};
+let teamsOpen = null;
+try { const v = localStorage.getItem('sap.teamsOpen'); if (v) teamsOpen = v === '1'; } catch (e) {}
+$('teamsToggle').onclick = () => {
+  teamsOpen = $('teamsBody').hidden;
+  try { localStorage.setItem('sap.teamsOpen', teamsOpen ? '1' : '0'); } catch (e) {}
+  render();
+};
 function teamCard(t){
   if (t.named && !renaming.has(t.id)) return `<div class="team l${t.lane} done" data-id="${t.id}">
     <div class="team-head"><span class="team-name">${esc(t.name)}</span>
-      ${flash[t.id] > Date.now() ? '<span class="saved">✓ Saved</span>' : ''}
-      <button class="edit-btn" data-rename="${t.id}" aria-label="Rename ${esc(t.name)}">✏️</button></div>
-    <small class="muted">${LANE_DOT[t.lane]} ${defaultName(t)} · ${t.members.map(esc).join(', ')}</small>
+      <span class="lane-tag l${t.lane}">${LANE_DOT[t.lane]} Lane ${t.lane}</span></div>
+    ${t.dupe ? `<p class="warn">⚠️ Another team grabbed this name at the same moment. Tap Rename to pick a new one.</p>` : ''}
+    <div class="team-sub"><small class="muted">${defaultName(t)} · ${t.members.map(esc).join(', ')}</small>
+      ${flash[t.id] > Date.now() ? '<span class="saved">✓ Saved</span>' : `<button class="edit-btn" data-rename="${t.id}" aria-label="Rename ${esc(t.name)}">✏️ Rename</button>`}</div>
   </div>`;
   return `<div class="team l${t.lane}" data-id="${t.id}">
     <div class="team-head"><span class="team-name">${esc(t.name)}</span><span class="lane-tag l${t.lane}">${LANE_DOT[t.lane]} Lane ${t.lane}</span></div>
     ${t.named ? `<small class="muted">${defaultName(t)}</small>` : ''}
     <div class="chips">${t.members.map(m => `<span class="chip">${esc(m)}</span>`).join('')}</div>
     <form class="name-form" data-id="${t.id}" autocomplete="off">
-      <input class="tname" data-id="${t.id}" maxlength="30" placeholder="Name ${defaultName(t)}…" value="${t.named ? esc(t.name) : ''}" aria-label="Team name for ${defaultName(t)}">
+      <input class="tname" data-id="${t.id}" maxlength="30" placeholder="Name ${defaultName(t)}…" value="${esc(state.names[t.id] || '')}" aria-label="Team name for ${defaultName(t)}">
       <button class="btn" type="submit">Save</button>
     </form>
     ${t.named ? `<button class="edit-btn" data-cancelrename="${t.id}">Cancel</button>` : ''}
@@ -391,9 +462,10 @@ function teamCard(t){
 function sideHTML(t, winner, bucket, note){
   const v = state[bucket][t.id];
   const win = winner && winner !== 'tie' && winner.id === t.id;
-  if (bucket !== 'scores') note = [note, `Round 1 ${state.scores[t.id]} + Round 2 ${v ?? '—'} = ${v == null ? '—' : state.scores[t.id] + v}`].filter(Boolean).join(' · ');
+  if (bucket !== 'scores') note = [note, `Round 1: ${state.scores[t.id]}`].filter(Boolean).join(' · ');
   return `<div class="side ${win ? 'win' : ''}">
-    <div class="who"><b>${esc(t.name)}</b><small>${t.members.map(esc).join(', ')}</small>${note ? `<small class="tally">${esc(note)}</small>` : ''}</div>
+    <div class="who"><b>${esc(t.name)}</b><small>${t.members.map(esc).join(', ')}</small>${note ? `<small class="tally">${esc(note)}</small>` : ''}${bucket !== 'scores'
+      ? `<small class="grand">Grand total: <b>${v == null ? '—' : state.scores[t.id] + v}</b></small>` : ''}</div>
     <input type="number" inputmode="numeric" min="0" max="${t.members.length * MAX_SCORE}" step="1" placeholder="Total"
       aria-label="${esc(t.name)} total score" data-b="${bucket}" data-t="${t.id}" value="${v ?? ''}">
   </div>`;
@@ -447,7 +519,7 @@ document.addEventListener('submit', e => {
   const id = f.dataset.id, t = team(id), input = f.querySelector('.tname'), err = document.querySelector(`[data-err="${id}"]`);
   const name = input.value.trim().replace(/\s+/g, ' ');
   if (!name) { err.textContent = 'Type a name first, superstar.'; return input.focus(); }
-  if (teams().some(x => x.id !== id && x.name.toLowerCase() === name.toLowerCase())) { err.textContent = 'Another team already has that name. Be original, darling.'; return input.focus(); }
+  if (ROSTER.some(x => x.id !== id && (state.names[x.id] || defaultName(x)).toLowerCase() === name.toLowerCase())) { err.textContent = 'Another team already has that name. Be original, darling.'; return input.focus(); }
   if (/^team [a-f]$/i.test(name) && name.toUpperCase() !== defaultName(t).toUpperCase()) { err.textContent = 'That looks like another team\'s placeholder. Pick something fabulous.'; return input.focus(); }
   err.textContent = '';
   if (db) db.doc('names/' + id).set({ name }).catch(oops);
@@ -463,26 +535,36 @@ document.addEventListener('click', e => {
 });
 
 // scores
-document.addEventListener('change', e => {
-  const { b, t } = e.target.dataset;
-  if (!b || rendering) return;
-  const tm = team(t);
+function commitScore(el, loud){
+  const { b, t } = el.dataset, tm = team(t);
   if (!tm) return;
-  const val = e.target.value.trim(), n = Number(val), max = tm.members.length * MAX_SCORE;
+  const val = el.value.trim(), n = Number(val), max = tm.members.length * MAX_SCORE;
   if (val !== '' && (!Number.isInteger(n) || n < 0 || n > max)) {
-    e.target.classList.add('bad');
+    if (!loud) return; // only complain once they're done typing
+    el.classList.add('bad');
     showDialog(`${val} isn't a possible total for ${tm.name}. With ${tm.members.length} bowlers the max is ${max} (300 per person). Enter a whole number from 0 to ${max}.`, null, [['Fix it', false]])
-      .then(() => { e.target.value = state[b][t] ?? ''; e.target.classList.remove('bad'); e.target.focus(); });
+      .then(() => { el.value = state[b][t] ?? ''; el.classList.remove('bad'); el.focus(); });
     return;
   }
   const v = val === '' ? null : n;
+  if ((state[b][t] ?? null) === v) return;
   if (db) {
-    const cur = { r1: state.scores[t] ?? null, final: state.final[t] ?? null, third: state.third[t] ?? null };
-    cur[b === 'scores' ? 'r1' : b] = v;
-    db.doc('scores/' + t).set(cur).catch(oops);
+    const f = b === 'scores' ? 'r1' : b;
+    // merge just this field so two phones scoring different rounds can't overwrite each other
+    (raw.scores[t] ? db.doc('scores/' + t).update({ [f]: v }) : db.doc('scores/' + t).set({ r1: null, final: null, third: null, ...raw.scores[t], [f]: v })).catch(oops);
   }
   if (v == null) delete state[b][t]; else state[b][t] = v;
   save(); render();
+}
+let typingTimer;
+document.addEventListener('change', e => { if (e.target.dataset.b && !rendering) commitScore(e.target, true); });
+document.addEventListener('input', e => { // save after a pause too, in case the phone locks before they tap away
+  if (!e.target.dataset.b) return;
+  clearTimeout(typingTimer); typingTimer = setTimeout(() => commitScore(e.target, false), 1500);
+});
+document.addEventListener('visibilitychange', () => {
+  const el = document.activeElement;
+  if (document.hidden && el && el.dataset && el.dataset.b) commitScore(el, false);
 });
 
 $('resetScoresBtn').onclick = async () => {
