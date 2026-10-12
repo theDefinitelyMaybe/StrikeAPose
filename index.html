@@ -117,27 +117,10 @@ input:focus,select:focus{outline:none;border-color:var(--pink);box-shadow:0 0 0 
 .team .muted{color:var(--muted);font-weight:600}
 .r2h{font-family:Bungee,sans-serif;font-size:15px;color:var(--plum);margin:16px 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .side small.tally{display:block;color:var(--plum);font-weight:700;margin-top:2px}
-.howto{margin:4px 0 6px}
-.eq{display:flex;align-items:center;justify-content:space-between;gap:4px}
-.eq > b{font-family:Bungee,sans-serif;font-size:20px;color:var(--plum)}
-.eq-box{flex:1;text-align:center;border:2px solid var(--line);border-radius:12px;padding:8px 4px;font-weight:900;font-size:14px;background:#fff;line-height:1.2}
-.eq-box small{display:block;font-weight:600;font-size:11px;color:var(--muted)}
-.eq-box.hot{border-color:var(--pink);color:#c4126f}
-.eq-box.gold{background:var(--yellow);border-color:var(--yellow)}
-.lane-map{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
-.lm{border-radius:12px;padding:8px 4px;text-align:center;color:#fff;background:var(--lc);line-height:1.25}
-.lm span{display:block;font-size:12px;font-weight:700;opacity:.95}
-.lm b{display:block;font-family:Bungee,sans-serif;font-size:13px}
-.lm small{font-size:11px;opacity:.9}
-.hint.center{text-align:center;margin-top:8px;font-size:13px}
 .team.done{padding:8px 12px}
 .team.done .team-head .edit-btn{margin:0 0 0 auto;text-decoration:none;font-size:18px;padding:2px 6px}
 .team.done .muted{display:block;font-size:13px;margin-top:2px}
 .saved{color:var(--green);font-weight:900;font-size:13px}
-.flow{display:flex;align-items:center;gap:4px;margin-top:10px}
-.flow span{flex:1;text-align:center;background:var(--plum);color:#fff;border-radius:10px;padding:7px 4px;font-size:12px;font-weight:700;line-height:1.25}
-.flow span.go{background:var(--pink)}
-.flow i{font-style:normal;font-weight:900;color:var(--plum)}
 .swap{margin:0 0 6px;font-size:13px;font-weight:700;color:var(--plum);background:#efe6fb;border-radius:10px;padding:8px 10px}
 .tools{display:flex;flex-wrap:wrap;gap:10px}
 .hint{font-size:14px;color:var(--muted);margin:4px 0 0}
@@ -169,15 +152,6 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
 .side small{line-height:1.35}
 .side small.grand{display:block;margin-top:2px;color:var(--ink);font-weight:600}
 .side small.grand b{display:inline;color:#c4126f;font-size:15px}
-.eq{align-items:stretch}
-.eq > b{align-self:center}
-.eq-box{display:flex;flex-direction:column;justify-content:center;white-space:nowrap}
-.eq-box.gold{font-size:13px}
-.lane-map{align-items:stretch}
-.lm{display:flex;flex-direction:column;justify-content:center}
-.flow span{display:flex;align-items:center;justify-content:center;align-self:stretch}
-.flow{align-items:stretch}
-.flow i{align-self:center}
 .lock input::placeholder{letter-spacing:normal}
 #syncNote{margin-top:12px}
 .dlg-box .e-actions{margin-top:14px}
@@ -186,6 +160,8 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
 .team.done .team-sub .edit-btn{margin:0;padding:2px 0;font-size:13px;text-decoration:none;white-space:nowrap;flex:none}
 .team.done .saved{flex:none}
 .warn{margin:6px 0 0;font-size:13px;font-weight:700;color:#a3125e}
+.hint.lead{margin:0 0 4px;font-size:15px;color:var(--ink)}
+#r1Body .hint.lead{margin-top:0}
 </style>
 </head>
 <body>
@@ -208,38 +184,18 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
   </section>
 
   <section class="card">
-    <h2>🎳 Round 1 · The Lanes</h2>
-    <div class="howto">
-      <div class="eq" aria-label="Add every bowler's score to get the team total">
-        <span class="eq-box">142<small>1st</small></span><b>+</b>
-        <span class="eq-box">118<small>2nd</small></span><b>+</b>
-        <span class="eq-box">165<small>3rd</small></span><b>=</b>
-        <span class="eq-box hot">425<small>you type</small></span>
-      </div>
-      <div class="flow">
-        <span>👑 Win your lane</span><i>→</i>
-        <span>Top 2 winners</span><i>→</i>
-        <span class="go">🏆 Lane 1 final</span>
-      </div>
+    <button class="sec-toggle" id="r1Toggle" aria-expanded="true" aria-controls="r1Body">
+      <h2>🎳 Round 1</h2><span class="tag" id="r1Count">0/3 lanes done</span><span class="chev" aria-hidden="true">▾</span>
+    </button>
+    <div id="r1Body">
+      <p class="hint lead">Add up your team's scores and type the <b>total</b>. Lane winners move on to Round 2.</p>
+      <div id="lanes"></div>
     </div>
-    <div id="lanes"></div>
   </section>
 
   <section class="card">
     <h2>🏆 Round 2</h2>
-    <div class="howto">
-      <div class="eq" aria-label="Round 1 total plus Round 2 game equals grand total">
-        <span class="eq-box">Round 1<small>carried over</small></span><b>+</b>
-        <span class="eq-box hot">Round 2<small>you type</small></span><b>=</b>
-        <span class="eq-box gold">Grand total<small>highest wins</small></span>
-      </div>
-      <div class="lane-map">
-        <div class="lm l1"><span>🩷 Lane 1</span><b>🏆 Top 2</b><small>for the crown</small></div>
-        <div class="lm l2"><span>💙 Lane 2</span><b id="lm2">3rd vs 4th</b><small>seed</small></div>
-        <div class="lm l3"><span>🧡 Lane 3</span><b id="lm3">5th vs 6th</b><small>seed</small></div>
-      </div>
-      <p class="hint center">🥉 Best grand total on Lanes 2 &amp; 3 wins bronze</p>
-    </div>
+    <p class="hint lead">Type your team's <b>Round 2 score</b>. We add your Round 1 score for the grand total.</p>
     <div id="final"></div>
   </section>
 
@@ -366,8 +322,7 @@ function render(){
   const named = teams().filter(t => t.named).length;
   $('namedCount').textContent = `${named}/6 named`;
   $('namedCount').classList.toggle('all', named === 6);
-  const open = teamsOpen ?? (named < 6 || renaming.size > 0); // collapses itself once every team is named, unless toggled
-  $('teamsBody').hidden = !open; $('teamsToggle').setAttribute('aria-expanded', open);
+  fold('teams', named < 6 || renaming.size > 0);
   if (!typing) $('teamList').innerHTML = teams().map(teamCard).join('');
   else teams().forEach(t => {
     const c = $('teamList').querySelector(`.team[data-id="${t.id}"]`);
@@ -388,6 +343,10 @@ function render(){
 
   // round 2
   const r2 = round2();
+  const lanesDone = lanes().filter(laneWinner).length;
+  $('r1Count').textContent = `${lanesDone}/3 lanes done`;
+  $('r1Count').classList.toggle('all', lanesDone === 3);
+  fold('r1', !r2.ready || (keep && keep.includes('"scores"')));
   if (!r2.ready) {
     $('final').innerHTML = `<p class="empty">${r2.seedTie
       ? `${esc(r2.seedTie[0].name)} and ${esc(r2.seedTie[1].name)} tied for the 4th seed. Bowl a roll-off, then add 1 to the winner's Round 1 total.`
@@ -416,28 +375,32 @@ function render(){
       </div>
       <h3 class="r2h">🥉 3rd Place Showdown <span class="status">${br === 'tie' ? 'Tie! Roll-off' : br ? 'Bronze: ' + esc(br.name) : 'In play'}</span></h3>
       ${br === 'tie' ? `<p class="swap">🎳 Tie for bronze! ${tiedNames(r2.bronze, 'third')} bowl a roll-off, then add 1 to the winner's Round 2 score.</p>` : ''}
-      ${r2.swapped ? '<p class="swap">🔀 No rematches! Seeds shuffled so nobody faces their Round 1 opponent again.</p>' : ''}
+      ${r2.swapped ? '<p class="swap">🔀 Shuffled so nobody replays their Round 1 opponent.</p>' : ''}
       ${match(r2.pairs[0], 2)}${match(r2.pairs[1], 3)}` +
       (ch && ch !== 'tie' ? `<div class="champ">🪩 Champions 🪩<span class="big">${esc(ch.name)}</span>
         <small>${ch.members.map(esc).join(' · ')}</small>
         <div class="podium">🥈 ${esc(runner.name)}${br && br !== 'tie' ? ` &nbsp; 🥉 ${esc(br.name)}` : ''}</div>
         ${lost.length ? `<div class="read">💅 And the losers get read: ${lost.map(t => `<b>${esc(t.name)}</b>`).join(', ')} — “${READS[lost.length % READS.length]}”</div>` : ''}</div>` : '');
   }
-  const sw = r2.ready && r2.swapped;
-  $('lm2').textContent = sw ? '3rd vs 5th' : '3rd vs 4th';
-  $('lm3').textContent = sw ? '4th vs 6th' : '5th vs 6th';
   rendering = false;
   if (keep) { const el = document.querySelector(keep); if (el) { el.value = draft; el.focus(); } }
 }
 
 const renaming = new Set(), flash = {};
-let teamsOpen = null;
-try { const v = localStorage.getItem('sap.teamsOpen'); if (v) teamsOpen = v === '1'; } catch (e) {}
-$('teamsToggle').onclick = () => {
-  teamsOpen = $('teamsBody').hidden;
-  try { localStorage.setItem('sap.teamsOpen', teamsOpen ? '1' : '0'); } catch (e) {}
-  render();
-};
+// foldable sections: fold themselves when done, unless this phone toggled them by hand
+const foldPref = {};
+for (const k of ['teams', 'r1']) {
+  try { const v = localStorage.getItem('sap.open.' + k); if (v) foldPref[k] = v === '1'; } catch (e) {}
+  $(k + 'Toggle').onclick = () => {
+    foldPref[k] = $(k + 'Body').hidden;
+    try { localStorage.setItem('sap.open.' + k, foldPref[k] ? '1' : '0'); } catch (e) {}
+    render();
+  };
+}
+function fold(k, autoOpen){
+  const open = foldPref[k] ?? autoOpen;
+  $(k + 'Body').hidden = !open; $(k + 'Toggle').setAttribute('aria-expanded', open);
+}
 function teamCard(t){
   if (t.named && !renaming.has(t.id)) return `<div class="team l${t.lane} done" data-id="${t.id}">
     <div class="team-head"><span class="team-name">${esc(t.name)}</span>
@@ -463,10 +426,11 @@ function sideHTML(t, winner, bucket, note){
   const v = state[bucket][t.id];
   const win = winner && winner !== 'tie' && winner.id === t.id;
   if (bucket !== 'scores') note = [note, `Round 1: ${state.scores[t.id]}`].filter(Boolean).join(' · ');
+  const ph = bucket === 'scores' ? 'Total' : 'Score';
   return `<div class="side ${win ? 'win' : ''}">
     <div class="who"><b>${esc(t.name)}</b><small>${t.members.map(esc).join(', ')}</small>${note ? `<small class="tally">${esc(note)}</small>` : ''}${bucket !== 'scores'
       ? `<small class="grand">Grand total: <b>${v == null ? '—' : state.scores[t.id] + v}</b></small>` : ''}</div>
-    <input type="number" inputmode="numeric" min="0" max="${t.members.length * MAX_SCORE}" step="1" placeholder="Total"
+    <input type="number" inputmode="numeric" min="0" max="${t.members.length * MAX_SCORE}" step="1" placeholder="${ph}"
       aria-label="${esc(t.name)} total score" data-b="${bucket}" data-t="${t.id}" value="${v ?? ''}">
   </div>`;
 }
