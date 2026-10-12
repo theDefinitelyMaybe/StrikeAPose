@@ -115,6 +115,8 @@ input:focus,select:focus{outline:none;border-color:var(--pink);box-shadow:0 0 0 
 .name-form input{flex:1;min-width:0;min-height:46px;padding:10px 12px}
 .name-form .btn{min-height:46px;padding:10px 16px;font-size:14px}
 .team .muted{color:var(--muted);font-weight:600}
+.r2h{font-family:Bungee,sans-serif;font-size:15px;color:var(--plum);margin:16px 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.side small.tally{display:block;color:var(--plum);font-weight:700;margin-top:2px}
 .tools{display:flex;flex-wrap:wrap;gap:10px}
 .hint{font-size:14px;color:var(--muted);margin:4px 0 0}
 footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
@@ -143,7 +145,7 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
 
   <section class="card">
     <h2>🏆 Round 2</h2>
-    <p class="hint">Fresh game, fresh scores. Enter each team's <b>combined total</b> for this round: add up every bowler's final game score (e.g. 150 + 131 + 172 = <b>453</b>). Round 1 scores don't carry over.<br>🏆 <b>Championship:</b> the top two teams, and the higher team total takes the crown.<br>🥉 <b>3rd Place Showdown:</b> everyone else, and the highest team total takes bronze.</p>
+    <p class="hint">Enter each team's <b>combined total for this game</b> (e.g. 150 + 131 + 172 = <b>453</b>). The page <b>adds it to the team's Round 1 total</b>, and the higher grand total wins.<br>🏆 <b>Championship · Lane 1:</b> the top two lane winners. Highest R1 + R2 takes the crown.<br>🥉 <b>3rd Place Showdown:</b> the other four, seeded by Round 1 total. 3rd vs 4th seed on Lane 2, 5th vs 6th seed on Lane 3. Highest R1 + R2 of the four takes bronze.</p>
     <div id="final"></div>
   </section>
 
@@ -224,10 +226,13 @@ const oops = e => { $('saveMsg').textContent = e && e.code === 'not_granted'
 
 /* ---------- tournament logic ---------- */
 const lanes = () => [1, 2, 3].map(n => teams().filter(t => t.lane === n));
-function best(ts, bucket){ // unique top scorer, 'tie', or null if any score is missing
-  if (!ts.length || ts.some(t => state[bucket][t.id] == null)) return null;
-  const max = Math.max(...ts.map(t => state[bucket][t.id]));
-  const tops = ts.filter(t => state[bucket][t.id] === max);
+// Round 2 totals carry Round 1 forward: R1 + R2
+const score = (t, bucket) => bucket === 'scores' ? state.scores[t.id]
+  : state[bucket][t.id] == null ? null : state.scores[t.id] + state[bucket][t.id];
+function best(ts, bucket){ // unique top total, 'tie', or null if any score is missing
+  if (!ts.length || ts.some(t => score(t, bucket) == null)) return null;
+  const max = Math.max(...ts.map(t => score(t, bucket)));
+  const tops = ts.filter(t => score(t, bucket) === max);
   return tops.length === 1 ? tops[0] : 'tie';
 }
 const laneWinner = pair => { const w = best(pair, 'scores'); return w === 'tie' ? null : w; };
@@ -237,7 +242,10 @@ function round2(){
   const ranked = winners.slice().sort((a, b) => state.scores[b.id] - state.scores[a.id]);
   if (state.scores[ranked[1].id] === state.scores[ranked[2].id]) return { ready: false, tie: [ranked[1], ranked[2]] };
   const ids = ranked.slice(0, 2).map(t => t.id);
-  return { ready: true, finalists: ranked.slice(0, 2), bronze: teams().filter(t => !ids.includes(t.id)) };
+  // seeds 3–6: everyone else ranked by Round 1 total; 3 vs 4 on Lane 2, 5 vs 6 on Lane 3
+  const rest = teams().filter(t => !ids.includes(t.id)).sort((a, b) => state.scores[b.id] - state.scores[a.id]);
+  if (state.scores[rest[1].id] === state.scores[rest[2].id]) return { ready: false, seedTie: [rest[1], rest[2]] };
+  return { ready: true, finalists: ranked.slice(0, 2), bronze: rest, pairs: [rest.slice(0, 2), rest.slice(2, 4)] };
 }
 
 /* ---------- render ---------- */
@@ -269,24 +277,32 @@ function render(){
   // round 2
   const r2 = round2();
   if (!r2.ready) {
-    $('final').innerHTML = `<p class="empty">${r2.tie
+    $('final').innerHTML = `<p class="empty">${r2.seedTie
+      ? `${esc(r2.seedTie[0].name)} and ${esc(r2.seedTie[1].name)} tied for the 4th seed. Bowl a roll-off, then add 1 to the winner's Round 1 total.`
+      : r2.tie
       ? `${esc(r2.tie[0].name)} and ${esc(r2.tie[1].name)} tied for the last Championship spot. Bowl a roll-off, then add 1 to the winner's Round 1 total.`
       : `Waiting on Round 1 — ${r2.done}/3 lane winners in.`}</p>`;
   } else {
     const ch = best(r2.finalists, 'final'), br = best(r2.bronze, 'third');
+    const seed = t => r2.bronze.indexOf(t) + 3, ord = n => n + (n === 3 ? 'rd' : 'th');
+    const match = (pair, laneNo) => { const w = best(pair, 'third'); return `<div class="lane l${laneNo}">
+        <div class="lane-title">${LANE_DOT[laneNo]} Lane ${laneNo} · ${ord(seed(pair[0]))} vs ${ord(seed(pair[1]))}<span class="status">${w === 'tie' ? 'Tie' : w ? 'Done' : 'In play'}</span></div>
+        ${sideHTML(pair[0], br, 'third', `${ord(seed(pair[0]))} seed`)}
+        <div class="vs">VS</div>
+        ${sideHTML(pair[1], br, 'third', `${ord(seed(pair[1]))} seed`)}
+      </div>`; };
     const runner = ch && ch !== 'tie' ? r2.finalists.find(t => t.id !== ch.id) : null;
     const lost = br && br !== 'tie' ? r2.bronze.filter(t => t.id !== br.id) : [];
     $('final').innerHTML = `
-      <div class="lane">
-        <div class="lane-title">🏆 Championship<span class="status">${ch === 'tie' ? 'Tie! Roll-off' : ch ? 'Crowned!' : 'In play'}</span></div>
-        ${sideHTML(r2.finalists[0], ch, 'final', `R1: ${state.scores[r2.finalists[0].id]}`)}
+      <h3 class="r2h">🏆 Championship</h3>
+      <div class="lane l1">
+        <div class="lane-title">${LANE_DOT[1]} Lane 1<span class="status">${ch === 'tie' ? 'Tie! Roll-off' : ch ? 'Crowned!' : 'In play'}</span></div>
+        ${sideHTML(r2.finalists[0], ch, 'final')}
         <div class="vs">VS</div>
-        ${sideHTML(r2.finalists[1], ch, 'final', `R1: ${state.scores[r2.finalists[1].id]}`)}
+        ${sideHTML(r2.finalists[1], ch, 'final')}
       </div>
-      <div class="lane">
-        <div class="lane-title">🥉 3rd Place Showdown<span class="status">${br === 'tie' ? 'Tie! Roll-off' : br ? 'Bronze in!' : 'In play'}</span></div>
-        ${r2.bronze.map(t => sideHTML(t, br, 'third')).join('')}
-      </div>` +
+      <h3 class="r2h">🥉 3rd Place Showdown <span class="status">${br === 'tie' ? 'Tie! Roll-off' : br ? 'Bronze: ' + esc(br.name) : 'In play'}</span></h3>
+      ${match(r2.pairs[0], 2)}${match(r2.pairs[1], 3)}` +
       (ch && ch !== 'tie' ? `<div class="champ">🪩 Champions 🪩<span class="big">${esc(ch.name)}</span>
         <small>${ch.members.map(esc).join(' · ')}</small>
         <div class="podium">🥈 ${esc(runner.name)}${br && br !== 'tie' ? ` &nbsp; 🥉 ${esc(br.name)}` : ''}</div>
@@ -312,9 +328,10 @@ function teamCard(t){
 function sideHTML(t, winner, bucket, note){
   const v = state[bucket][t.id];
   const win = winner && winner !== 'tie' && winner.id === t.id;
+  if (bucket !== 'scores') note = [note, `R1 ${state.scores[t.id]} + R2 ${v ?? '—'} = ${v == null ? '—' : state.scores[t.id] + v}`].filter(Boolean).join(' · ');
   return `<div class="side ${win ? 'win' : ''}">
-    <div class="who"><b>${esc(t.name)}${bucket !== 'scores' ? ` <span class="lane-tag l${t.lane}">Lane ${t.lane}</span>` : ''}</b><small>${note ? esc(note) + ' · ' : ''}${t.members.map(esc).join(', ')}</small></div>
-    <input type="number" inputmode="numeric" min="0" max="${t.members.length * MAX_SCORE}" step="1" placeholder="Total"
+    <div class="who"><b>${esc(t.name)}</b><small>${t.members.map(esc).join(', ')}</small>${note ? `<small class="tally">${esc(note)}</small>` : ''}</div>
+    <input type="number" inputmode="numeric" min="0" max="${t.members.length * MAX_SCORE}" step="1" placeholder="${bucket === 'scores' ? 'Total' : 'R2 total'}"
       aria-label="${esc(t.name)} total score" data-b="${bucket}" data-t="${t.id}" value="${v ?? ''}">
   </div>`;
 }
@@ -419,7 +436,9 @@ $('exportBtn').onclick = async () => {
   const out = ['🎳 Strike a Pose, Spare No One — Results', '']
     .concat(lanes().map((p, i) => `Lane ${i+1}: ` + line(p, 'scores')));
   if (r2.ready) {
-    out.push('', 'Championship: ' + line(r2.finalists, 'final'), '3rd place: ' + line(r2.bronze, 'third'));
+    const line2 = (ts, b) => ts.map(t => `${t.name} ${score(t, b) ?? '–'}`).join(' vs ');
+    out.push('', 'Championship (Lane 1, R1+R2): ' + line2(r2.finalists, 'final'),
+      '3rd place (R1+R2): Lane 2 ' + line2(r2.pairs[0], 'third') + ' · Lane 3 ' + line2(r2.pairs[1], 'third'));
     const ch = best(r2.finalists, 'final'), br = best(r2.bronze, 'third');
     if (ch && ch !== 'tie') out.push('', `👑 Champions: ${ch.name} (${ch.members.join(', ')})`);
     if (br && br !== 'tie') out.push(`🥉 3rd place: ${br.name}`);
