@@ -130,6 +130,14 @@ input:focus,select:focus{outline:none;border-color:var(--pink);box-shadow:0 0 0 
 .lm b{display:block;font-family:Bungee,sans-serif;font-size:13px}
 .lm small{font-size:11px;opacity:.9}
 .hint.center{text-align:center;margin-top:8px}
+.team.done{padding:8px 12px}
+.team.done .team-head .edit-btn{margin:0 0 0 auto;text-decoration:none;font-size:18px;padding:2px 6px}
+.team.done .muted{display:block;font-size:13px;margin-top:2px}
+.saved{color:var(--green);font-weight:900;font-size:13px}
+.flow{display:flex;align-items:center;gap:4px;margin-top:10px}
+.flow span{flex:1;text-align:center;background:var(--plum);color:#fff;border-radius:10px;padding:7px 4px;font-size:12px;font-weight:700;line-height:1.25}
+.flow span.go{background:var(--pink)}
+.flow i{font-style:normal;font-weight:900;color:var(--plum)}
 .tools{display:flex;flex-wrap:wrap;gap:10px}
 .hint{font-size:14px;color:var(--muted);margin:4px 0 0}
 footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
@@ -146,13 +154,25 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
 
   <section class="card">
     <h2>👯 The Teams</h2>
-    <p class="hint">Teams and lanes are set. Find your squad and <b>give it a fabulous name</b>. Any teammate can name it, and you can change it until the first ball is thrown.</p>
+    <p class="hint">Name your squad 👇 <span class="tag" id="namedCount">0/6 named</span></p>
     <div class="teams" id="teamList"></div>
   </section>
 
   <section class="card">
     <h2>🎳 Round 1 · The Lanes</h2>
-    <p class="hint">Enter each team's <b>combined total</b>: add up every bowler's final game score (e.g. 142 + 118 + 165 = <b>425</b>). Higher team total wins the lane. The <b>two lane winners with the highest totals</b> go to the Championship. Typo? Tap the score and fix it.</p>
+    <div class="howto">
+      <div class="eq" aria-label="Add every bowler's score to get the team total">
+        <span class="eq-box">142<small>1st</small></span><b>+</b>
+        <span class="eq-box">118<small>2nd</small></span><b>+</b>
+        <span class="eq-box">165<small>3rd</small></span><b>=</b>
+        <span class="eq-box hot">425<small>you enter</small></span>
+      </div>
+      <div class="flow">
+        <span>👑 Win your lane</span><i>→</i>
+        <span>Top 2 winners</span><i>→</i>
+        <span class="go">🏆 Lane 1 final</span>
+      </div>
+    </div>
     <div id="lanes"></div>
   </section>
 
@@ -281,6 +301,7 @@ function render(){
 
   // team cards; a card someone is typing a name into is left alone so live updates don't wipe it
   const typing = fa && fa.classList && fa.classList.contains('tname') ? fa.dataset.id : null;
+  $('namedCount').textContent = `${teams().filter(t => t.named).length}/6 named`;
   if (!typing) $('teamList').innerHTML = teams().map(teamCard).join('');
   else teams().forEach(t => {
     const c = $('teamList').querySelector(`.team[data-id="${t.id}"]`);
@@ -337,15 +358,23 @@ function render(){
   if (keep) { const el = document.querySelector(keep); if (el) el.focus(); }
 }
 
+const renaming = new Set(), flash = {};
 function teamCard(t){
+  if (t.named && !renaming.has(t.id)) return `<div class="team l${t.lane} done" data-id="${t.id}">
+    <div class="team-head"><span class="team-name">${esc(t.name)}</span>
+      ${flash[t.id] > Date.now() ? '<span class="saved">✓ Saved</span>' : ''}
+      <button class="edit-btn" data-rename="${t.id}" aria-label="Rename ${esc(t.name)}">✏️</button></div>
+    <small class="muted">${LANE_DOT[t.lane]} ${defaultName(t)} · ${t.members.map(esc).join(', ')}</small>
+  </div>`;
   return `<div class="team l${t.lane}" data-id="${t.id}">
     <div class="team-head"><span class="team-name">${esc(t.name)}</span><span class="lane-tag l${t.lane}">${LANE_DOT[t.lane]} Lane ${t.lane}</span></div>
     ${t.named ? `<small class="muted">${defaultName(t)}</small>` : ''}
     <div class="chips">${t.members.map(m => `<span class="chip">${esc(m)}</span>`).join('')}</div>
     <form class="name-form" data-id="${t.id}" autocomplete="off">
       <input class="tname" data-id="${t.id}" maxlength="30" placeholder="Name ${defaultName(t)}…" value="${t.named ? esc(t.name) : ''}" aria-label="Team name for ${defaultName(t)}">
-      <button class="btn" type="submit">${t.named ? 'Rename' : 'Save'}</button>
+      <button class="btn" type="submit">Save</button>
     </form>
+    ${t.named ? `<button class="edit-btn" data-cancelrename="${t.id}">Cancel</button>` : ''}
     <div class="msg err" data-err="${t.id}"></div>
   </div>`;
 }
@@ -414,8 +443,14 @@ document.addEventListener('submit', e => {
   err.textContent = '';
   if (db) db.doc('names/' + id).set({ name }).catch(oops);
   state.names[id] = name; save();
+  renaming.delete(id); flash[id] = Date.now() + 3000;
   input.blur(); render();
-  const c = document.querySelector(`.team[data-id="${id}"] .msg`); if (c) { c.className = 'msg ok'; c.textContent = `Saved! You are now ${name}. 💅`; }
+  setTimeout(render, 3100);
+});
+document.addEventListener('click', e => {
+  const { rename, cancelrename } = e.target.dataset;
+  if (rename) { renaming.add(rename); render(); const i = document.querySelector(`.tname[data-id="${rename}"]`); if (i) { i.focus(); i.select(); } }
+  if (cancelrename) { renaming.delete(cancelrename); render(); }
 });
 
 // scores
