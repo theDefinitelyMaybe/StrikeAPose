@@ -180,8 +180,8 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
     <h2>🏆 Round 2</h2>
     <div class="howto">
       <div class="eq" aria-label="Round 1 total plus Round 2 game equals grand total">
-        <span class="eq-box">R1 total<small>carried over</small></span><b>+</b>
-        <span class="eq-box hot">R2 game<small>you enter</small></span><b>=</b>
+        <span class="eq-box">Round 1<small>carried over</small></span><b>+</b>
+        <span class="eq-box hot">Round 2<small>you enter</small></span><b>=</b>
         <span class="eq-box gold">Grand total<small>highest wins</small></span>
       </div>
       <div class="lane-map">
@@ -382,10 +382,10 @@ function teamCard(t){
 function sideHTML(t, winner, bucket, note){
   const v = state[bucket][t.id];
   const win = winner && winner !== 'tie' && winner.id === t.id;
-  if (bucket !== 'scores') note = [note, `R1 ${state.scores[t.id]} + R2 ${v ?? '—'} = ${v == null ? '—' : state.scores[t.id] + v}`].filter(Boolean).join(' · ');
+  if (bucket !== 'scores') note = [note, `Round 1 ${state.scores[t.id]} + Round 2 ${v ?? '—'} = ${v == null ? '—' : state.scores[t.id] + v}`].filter(Boolean).join(' · ');
   return `<div class="side ${win ? 'win' : ''}">
     <div class="who"><b>${esc(t.name)}</b><small>${t.members.map(esc).join(', ')}</small>${note ? `<small class="tally">${esc(note)}</small>` : ''}</div>
-    <input type="number" inputmode="numeric" min="0" max="${t.members.length * MAX_SCORE}" step="1" placeholder="${bucket === 'scores' ? 'Total' : 'R2 total'}"
+    <input type="number" inputmode="numeric" min="0" max="${t.members.length * MAX_SCORE}" step="1" placeholder="Total"
       aria-label="${esc(t.name)} total score" data-b="${bucket}" data-t="${t.id}" value="${v ?? ''}">
   </div>`;
 }
@@ -497,8 +497,8 @@ $('exportBtn').onclick = async () => {
     .concat(lanes().map((p, i) => `Lane ${i+1}: ` + line(p, 'scores')));
   if (r2.ready) {
     const line2 = (ts, b) => ts.map(t => `${t.name} ${score(t, b) ?? '–'}`).join(' vs ');
-    out.push('', 'Championship (Lane 1, R1+R2): ' + line2(r2.finalists, 'final'),
-      '3rd place (R1+R2): Lane 2 ' + line2(r2.pairs[0], 'third') + ' · Lane 3 ' + line2(r2.pairs[1], 'third'));
+    out.push('', 'Championship (Lane 1, Round 1 + Round 2): ' + line2(r2.finalists, 'final'),
+      '3rd place (Round 1 + Round 2): Lane 2 ' + line2(r2.pairs[0], 'third') + ' · Lane 3 ' + line2(r2.pairs[1], 'third'));
     const ch = best(r2.finalists, 'final'), br = best(r2.bronze, 'third');
     if (ch && ch !== 'tie') out.push('', `👑 Champions: ${ch.name} (${ch.members.join(', ')})`);
     if (br && br !== 'tie') out.push(`🥉 3rd place: ${br.name}`);
