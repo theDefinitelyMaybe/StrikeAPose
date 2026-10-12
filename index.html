@@ -117,6 +117,19 @@ input:focus,select:focus{outline:none;border-color:var(--pink);box-shadow:0 0 0 
 .team .muted{color:var(--muted);font-weight:600}
 .r2h{font-family:Bungee,sans-serif;font-size:15px;color:var(--plum);margin:16px 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .side small.tally{display:block;color:var(--plum);font-weight:700;margin-top:2px}
+.howto{margin:4px 0 6px}
+.eq{display:flex;align-items:center;justify-content:space-between;gap:4px}
+.eq > b{font-family:Bungee,sans-serif;font-size:20px;color:var(--plum)}
+.eq-box{flex:1;text-align:center;border:2px solid var(--line);border-radius:12px;padding:8px 4px;font-weight:900;font-size:14px;background:#fff;line-height:1.2}
+.eq-box small{display:block;font-weight:600;font-size:11px;color:var(--muted)}
+.eq-box.hot{border-color:var(--pink);color:#c4126f}
+.eq-box.gold{background:var(--yellow);border-color:var(--yellow)}
+.lane-map{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+.lm{border-radius:12px;padding:8px 4px;text-align:center;color:#fff;background:var(--lc);line-height:1.25}
+.lm span{display:block;font-size:12px;font-weight:700;opacity:.95}
+.lm b{display:block;font-family:Bungee,sans-serif;font-size:13px}
+.lm small{font-size:11px;opacity:.9}
+.hint.center{text-align:center;margin-top:8px}
 .tools{display:flex;flex-wrap:wrap;gap:10px}
 .hint{font-size:14px;color:var(--muted);margin:4px 0 0}
 footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
@@ -145,7 +158,19 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
 
   <section class="card">
     <h2>🏆 Round 2</h2>
-    <p class="hint">Enter each team's <b>combined total for this game</b> (e.g. 150 + 131 + 172 = <b>453</b>). The page <b>adds it to the team's Round 1 total</b>, and the higher grand total wins.<br>🏆 <b>Championship · Lane 1:</b> the top two lane winners. Highest R1 + R2 takes the crown.<br>🥉 <b>3rd Place Showdown:</b> the other four, seeded by Round 1 total. 3rd vs 4th seed on Lane 2, 5th vs 6th seed on Lane 3. Highest R1 + R2 of the four takes bronze.</p>
+    <div class="howto">
+      <div class="eq" aria-label="Round 1 total plus Round 2 game equals grand total">
+        <span class="eq-box">R1 total<small>carried over</small></span><b>+</b>
+        <span class="eq-box hot">R2 game<small>you enter</small></span><b>=</b>
+        <span class="eq-box gold">Grand total<small>highest wins</small></span>
+      </div>
+      <div class="lane-map">
+        <div class="lm l1"><span>🩷 Lane 1</span><b>🏆 Top 2</b><small>for the crown</small></div>
+        <div class="lm l2"><span>💙 Lane 2</span><b>3rd vs 4th</b><small>seed</small></div>
+        <div class="lm l3"><span>🧡 Lane 3</span><b>5th vs 6th</b><small>seed</small></div>
+      </div>
+      <p class="hint center">🥉 Best grand total on Lanes 2 &amp; 3 takes bronze</p>
+    </div>
     <div id="final"></div>
   </section>
 
