@@ -193,6 +193,13 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
 .cell.tot b{color:var(--ink)}
 .side.win .cell{background:#fff}
 .side.win .cell.tot{background:var(--yellow)}
+.ppl{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.ppl span{display:inline-flex;align-items:center;justify-content:center;height:26px;padding:0 10px;border-radius:999px;background:var(--plum);color:#fff;font-weight:700;font-size:14px;line-height:1}
+.side.win .ppl span{background:var(--ink)}
+.seed{display:inline-flex;align-items:center;height:20px;padding:0 8px;margin-left:4px;border-radius:999px;background:#f4eefb;color:var(--plum);font:700 11px Inter,sans-serif;vertical-align:middle}
+.side .who b{font-size:17px}
+.side:not(.r2) .ppl{grid-column:1/-1;margin-top:0}
+.side:not(.r2){row-gap:8px}
 </style>
 </head>
 <body>
@@ -453,19 +460,21 @@ function teamCard(t){
   </div>`;
 }
 
+const people = t => `<div class="ppl">${t.members.map(m => `<span>${esc(m)}</span>`).join('')}</div>`;
 function sideHTML(t, winner, bucket, note){
   const v = state[bucket][t.id];
   const win = winner && winner !== 'tie' && winner.id === t.id;
   const input = ph => `<input type="number" inputmode="numeric" min="0" max="${t.members.length * MAX_SCORE}" step="1" placeholder="${ph}"
       aria-label="${esc(t.name)} ${bucket === 'scores' ? 'Round 1 total' : 'Round 2 score'}" data-b="${bucket}" data-t="${t.id}" value="${v ?? ''}">`;
   if (bucket === 'scores') return `<div class="side ${win ? 'win' : ''}">
-    <div class="who"><b>${esc(t.name)}</b><small>${t.members.map(esc).join(', ')}</small></div>
+    <div class="who"><b>${esc(t.name)}</b></div>
     ${input('Total')}
+    ${people(t)}
   </div>`;
   // Round 2: show the sum right on the card so it's obvious Round 1 is added in
   const r1 = state.scores[t.id];
   return `<div class="side r2 ${win ? 'win' : ''}">
-    <div class="who"><b>${esc(t.name)}</b><small>${note ? esc(note) + ' · ' : ''}${t.members.map(esc).join(', ')}</small></div>
+    <div class="who"><b>${esc(t.name)}${note ? ` <span class="seed">${esc(note)}</span>` : ''}</b>${people(t)}</div>
     <div class="sum">
       <span class="cell"><small>Round 1</small><b>${r1}</b></span><i aria-hidden="true">+</i>
       <span class="cell in"><small>Round 2</small>${input('Type')}</span><i aria-hidden="true">=</i>
