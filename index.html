@@ -342,6 +342,8 @@ function rebuild(){
     for (const [k, f] of [['scores', 'r1'], ['final', 'final'], ['third', 'third']]) if (sc[f] != null) s[k][id] = sc[f];
   state = s; render();
 }
+// change only the given fields, creating the record if needed, so two quick saves can never undo each other
+const mergeDoc = (path, d) => { const r = db.doc(path); return r.merge ? r.merge(d) : r.update(d).catch(() => r.set(d)); };
 const byId = snap => Object.fromEntries(snap.docs.map(d => [d.id, d.data()]));
 const oops = e => { $('saveMsg').textContent = e && e.code === 'not_granted'
   ? "You're view-only on this page — ask the host for edit access." : 'Could not save — check your connection and try again.'; };
@@ -358,7 +360,7 @@ async function firebaseDb(){
   const wrap = s => ({ docs: s.docs.map(d => ({ id: d.id, data: () => d.data(), metadata: d.metadata })), pending: s.metadata.hasPendingWrites, cached: s.metadata.fromCache });
   return {
     collection: c => ({ onSnapshot: (cb, err) => F.onSnapshot(F.collection(fs, c), { includeMetadataChanges: true }, s => cb(wrap(s)), err) }),
-    doc: path => { const r = F.doc(fs, path); return { set: d => F.setDoc(r, d), update: d => F.updateDoc(r, d), delete: () => F.deleteDoc(r) }; }
+    doc: path => { const r = F.doc(fs, path); return { set: d => F.setDoc(r, d), merge: d => F.setDoc(r, d, { merge: true }), update: d => F.updateDoc(r, d), delete: () => F.deleteDoc(r) }; }
   };
 }
 // little status badge so people know whether their score has reached everyone
@@ -425,10 +427,25 @@ function round2(){
 }
 
 /* ---------- render ---------- */
-let rendering = false;
+// Update the page in place instead of rebuilding it, so a live update never disturbs the box someone is typing in
+// (their focus, cursor, selection and half-typed number all stay put).
+function morph(from, to){
+  if (from.nodeType !== to.nodeType || from.nodeName !== to.nodeName) { from.replaceWith(to); return; }
+  if (from.nodeType === 3) { if (from.nodeValue !== to.nodeValue) from.nodeValue = to.nodeValue; return; }
+  if (from.nodeType !== 1) return;
+  const typing = from === document.activeElement && from.dataset.dirty; // someone is mid-edit in this box
+  for (const a of [...from.attributes]) if (!to.hasAttribute(a.name) && a.name !== 'data-dirty') from.removeAttribute(a.name);
+  for (const a of [...to.attributes]) if (from.getAttribute(a.name) !== a.value && !(typing && a.name === 'value')) from.setAttribute(a.name, a.value);
+  if (from.tagName === 'INPUT' && !typing && from.value !== (to.getAttribute('value') ?? '')) from.value = to.getAttribute('value') ?? '';
+  const fc = [...from.childNodes], tc = [...to.childNodes];
+  tc.forEach((n, i) => i < fc.length ? morph(fc[i], n) : from.appendChild(n));
+  fc.slice(tc.length).forEach(n => n.remove());
+}
+function patch(el, html){ const t = el.cloneNode(false); t.innerHTML = html; morph(el, t); }
+let rendering = false, refocusing = false;
 function render(){
   if (rendering) return; rendering = true;
-  const fa = document.activeElement, keep = fa && fa.dataset && fa.dataset.t ? `input[data-b="${fa.dataset.b}"][data-t="${fa.dataset.t}"]` : null;
+  const fa = document.activeElement, keep = fa && fa.dataset && fa.dataset.t && fa.dataset.dirty ? `input[data-b="${fa.dataset.b}"][data-t="${fa.dataset.t}"]` : null;
   const draft = keep ? fa.value : null; // what this phone is mid-typing; live updates must not wipe it
 
   // team cards; a card someone is typing a name into is left alone so live updates don't wipe it
@@ -444,7 +461,7 @@ function render(){
   });
 
   // round 1
-  $('lanes').innerHTML = lanes().map((pair, i) => {
+  patch($('lanes'), lanes().map((pair, i) => {
     const w = laneWinner(pair), tied = best(pair, 'scores') === 'tie';
     const status = w ? 'Winner in!' : tied ? 'Tie! Roll-off +1' : 'In play';
     return `<div class="lane l${i+1}">
@@ -454,7 +471,7 @@ function render(){
       <div class="vs">VS</div>
       ${sideHTML(pair[1], w, 'scores')}
     </div>`;
-  }).join('');
+  }).join(''));
 
   // round 2
   const r2 = round2();
@@ -463,11 +480,11 @@ function render(){
   $('r1Count').classList.toggle('all', lanesDone === 3);
   fold('r1', !r2.ready || (keep && keep.includes('"scores"')));
   if (!r2.ready) {
-    $('final').innerHTML = `<p class="empty">${r2.seedTie
+    patch($('final'), `<p class="empty">${r2.seedTie
       ? `${esc(r2.seedTie[0].name)} and ${esc(r2.seedTie[1].name)} tied for the 4th seed. Bowl a roll-off, then add 1 to the winner's Round 1 total.`
       : r2.tie
       ? `${esc(r2.tie[0].name)} and ${esc(r2.tie[1].name)} tied for the last Championship spot. Bowl a roll-off, then add 1 to the winner's Round 1 total.`
-      : `Waiting on Round 1 — ${r2.done}/3 lane winners in.`}</p>`;
+      : `Waiting on Round 1 — ${r2.done}/3 lane winners in.`}</p>`);
   } else {
     const ch = best(r2.finalists, 'final'), br = best(r2.bronze, 'third');
     const seed = t => r2.bronze.indexOf(t) + 3, ord = n => n + (n === 3 ? 'rd' : 'th');
@@ -480,7 +497,7 @@ function render(){
       </div>`; };
     const runner = ch && ch !== 'tie' ? r2.finalists.find(t => t.id !== ch.id) : null;
     const lost = br && br !== 'tie' ? r2.bronze.filter(t => t.id !== br.id) : [];
-    $('final').innerHTML = `
+    patch($('final'), `
       <h3 class="r2h">🏆 Championship</h3>
       ${ch === 'tie' ? `<p class="swap">🎳 Tied for the crown! ${tiedNames(r2.finalists, 'final')} bowl a roll-off, then add 1 to the winner's Round 2 score.</p>` : ''}
       <div class="lane l1">
@@ -497,11 +514,11 @@ function render(){
       (ch && ch !== 'tie' ? `<div class="champ">🪩 Champions 🪩<span class="big">${esc(ch.name)}</span>
         <small>${ch.members.map(esc).join(' · ')}</small>
         <div class="podium">🥈 ${esc(runner.name)}${br && br !== 'tie' ? ` &nbsp; 🥉 ${esc(br.name)}` : ''}</div>
-        ${lost.length ? `<div class="read">💅 And the losers get read: ${lost.map(t => `<b>${esc(t.name)}</b>`).join(', ')} — “${READS[lost.length % READS.length]}”</div>` : ''}</div>` : '');
+        ${lost.length ? `<div class="read">💅 And the losers get read: ${lost.map(t => `<b>${esc(t.name)}</b>`).join(', ')} — “${READS[lost.length % READS.length]}”</div>` : ''}</div>` : ''));
   }
   renderHost();
   rendering = false;
-  if (keep) { const el = document.querySelector(keep); if (el) { el.value = draft; el.focus(); } }
+  if (keep && document.activeElement !== fa) { const el = document.querySelector(keep); if (el) { el.value = draft; el.dataset.dirty = '1'; refocusing = true; el.focus(); refocusing = false; } }
 }
 
 const renaming = new Set(), flash = {};
@@ -552,7 +569,8 @@ function sideHTML(t, winner, bucket, note){
   const win = winner && winner !== 'tie' && winner.id === t.id;
   const unsaved = raw.pending.has(t.id) && v != null;
   const flag = unsaved ? '<span class="unsaved" role="status">⏳ Not saved yet</span>' : '';
-  const input = ph => `<input class="${unsaved ? 'is-unsaved' : ''}" type="number" inputmode="numeric" min="0" max="${t.members.length * MAX_SCORE}" step="1" placeholder="${ph}"
+  // a text box with the number keypad (not type=number), so tapping it can select the old score for a clean correction
+  const input = ph => `<input class="${unsaved ? 'is-unsaved' : ''}" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="${ph}"
       aria-label="${esc(t.name)} ${bucket === 'scores' ? 'Round 1 total' : 'Round 2 score'}" data-b="${bucket}" data-t="${t.id}" value="${v ?? ''}">`;
   if (bucket === 'scores') return `<div class="side ${win ? 'win' : ''}">
     <div class="who"><b>${esc(t.name)}</b></div>
@@ -645,9 +663,8 @@ function setScore(t, b, v, extra = {}){
   const f = FIELD[b], from = state[b][t] ?? null;
   if (from === v) return;
   if (db) {
-    const ref = db.doc(P('scores') + '/' + t);
-    // merge just this field so two phones scoring different rounds can't overwrite each other
-    (raw.scores[t] ? ref.update({ [f]: v }) : ref.set({ r1: null, final: null, third: null, ...raw.scores[t], [f]: v })).catch(oops);
+    // merge just this field so two phones (or two quick taps) scoring different rounds can't overwrite each other
+    mergeDoc(P('scores') + '/' + t, { [f]: v }).catch(oops);
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     db.doc(P('log') + '/' + id).set({ at: Date.now(), team: t, field: f, from, to: v, by: whoAmI(), ...extra }).catch(oops);
   }
@@ -657,25 +674,42 @@ function setScore(t, b, v, extra = {}){
 function commitScore(el, loud){
   const { b, t } = el.dataset, tm = team(t);
   if (!tm) return;
+  clearTimeout(typingTimers[b + t]);
   const val = el.value.trim(), n = Number(val), max = tm.members.length * MAX_SCORE;
+  if (loud) delete el.dataset.dirty;
   if (val !== '' && (!Number.isInteger(n) || n < 0 || n > max)) {
     if (!loud) return; // only complain once they're done typing
     el.classList.add('bad');
     showDialog(`${val} isn't a possible total for ${tm.name}. With ${tm.members.length} bowlers the max is ${max} (300 per person). Enter a whole number from 0 to ${max}.`, null, [['Fix it', false]])
-      .then(() => { el.value = state[b][t] ?? ''; el.classList.remove('bad'); el.focus(); });
+      .then(() => { const cur = scoreBox(b, t) || el; cur.value = state[b][t] ?? ''; cur.classList.remove('bad'); cur.focus(); });
     return;
   }
+  delete el.dataset.dirty;
   setScore(t, b, val === '' ? null : n);
 }
-let typingTimer;
-document.addEventListener('change', e => { if (e.target.dataset.b && !rendering) commitScore(e.target, true); });
+// Live updates rebuild the score boxes, so never rely on the browser's own "changed" event alone:
+// each box saves on its own timer, and whenever someone leaves a box holding an unsaved number.
+const typingTimers = {};
+const scoreBox = (b, t) => document.querySelector(`input[data-b="${b}"][data-t="${t}"]`);
+// only boxes someone actually typed in count; a box that merely has focus never overwrites another phone's score
+const differs = el => !!el.dataset.dirty && el.value.trim() !== String(state[el.dataset.b][el.dataset.t] ?? '');
+document.addEventListener('change', e => { if (e.target.dataset.b && !rendering && e.target.dataset.dirty) commitScore(e.target, true); });
+// tapping a score box selects what's there, so typing a correction replaces it instead of gluing digits on
+const selectAll = el => setTimeout(() => { if (document.activeElement === el && el.value) el.select(); }, 0); // after the browser places its cursor
+document.addEventListener('focusin', e => { if (e.target.dataset.b && e.target.value && !refocusing) selectAll(e.target); });
+// …including a tap on a box that already has focus (e.g. after "Next" on the keyboard), which would otherwise drop the cursor mid-number
+document.addEventListener('click', e => { if (e.target.dataset && e.target.dataset.b && e.target.value) selectAll(e.target); });
+document.addEventListener('focusout', e => { if (e.target.dataset.b && !rendering && e.target.isConnected && differs(e.target)) commitScore(e.target, true); });
 document.addEventListener('input', e => { // save after a pause too, in case the phone locks before they tap away
-  if (!e.target.dataset.b) return;
-  clearTimeout(typingTimer); typingTimer = setTimeout(() => commitScore(e.target, false), 1500);
+  const { b, t } = e.target.dataset;
+  if (!b) return;
+  e.target.dataset.dirty = '1';
+  clearTimeout(typingTimers[b + t]);
+  typingTimers[b + t] = setTimeout(() => { const el = scoreBox(b, t); if (el && differs(el)) commitScore(el, false); }, 1500);
 });
 document.addEventListener('visibilitychange', () => {
-  const el = document.activeElement;
-  if (document.hidden && el && el.dataset && el.dataset.b) commitScore(el, false);
+  if (!document.hidden) return;
+  document.querySelectorAll('input[data-b]').forEach(el => { if (differs(el)) commitScore(el, false); });
 });
 
 /* ---------- host: change history with undo, scorekeepers ---------- */
@@ -715,9 +749,8 @@ function renderHost(){
 document.addEventListener('change', e => {
   const n = e.target.dataset.keeper;
   if (!n || !hostOnly()) return;
-  const keepers = { ...raw.keepers, [n]: e.target.value || null };
-  raw.keepers = keepers;
-  if (db) db.doc(P('meta') + '/keepers').set(keepers).catch(oops);
+  raw.keepers = { ...raw.keepers, [n]: e.target.value || null };
+  if (db) mergeDoc(P('meta') + '/keepers', { [n]: e.target.value || null }).catch(oops);
   render();
 });
 document.addEventListener('click', async e => {
