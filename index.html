@@ -200,6 +200,9 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
 .side .who b{font-size:17px}
 .side:not(.r2) .ppl{grid-column:1/-1;margin-top:0}
 .side:not(.r2){row-gap:8px}
+.live{display:inline-block;margin:12px 0 0;padding:6px 12px;border-radius:999px;font:700 13px Inter,sans-serif}
+.live.ok{background:#d9f7e7;color:#0b6435}
+.live.wait{background:var(--yellow);color:var(--ink)}
 </style>
 </head>
 <body>
@@ -209,6 +212,7 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
     <span class="disco" aria-hidden="true">🪩</span>
     <h1>Strike a Pose,<br>Spare No One</h1>
     <p class="sub">The Birthday Bowl-Off · The Gutter, LIC · Sun Oct 18</p>
+    <p class="live" id="live" role="status" hidden></p>
   </header>
 
   <section class="card">
@@ -308,14 +312,46 @@ function rebuild(){
 const byId = snap => Object.fromEntries(snap.docs.map(d => [d.id, d.data()]));
 const oops = e => { $('saveMsg').textContent = e && e.code === 'not_granted'
   ? "You're view-only on this page — ask the host for edit access." : 'Could not save — check your connection and try again.'; };
+// On claude.ai the page uses Claude's shared storage; on the public GitHub link it uses Firebase.
+const FIREBASE_PROJECT = 'strikeapose-6d24d';
+async function firebaseDb(){
+  const { initializeApp } = await import('./vendor/firebase-app.js');
+  const F = await import('./vendor/firebase-firestore.js');
+  // Firestore only needs the project id; the key is required by the SDK's shape but not checked by Firestore
+  const app = initializeApp({ projectId: FIREBASE_PROJECT, apiKey: 'firestore-only' });
+  let fs;
+  try { fs = F.initializeFirestore(app, { localCache: F.persistentLocalCache({ tabManager: F.persistentMultipleTabManager() }) }); }
+  catch (e) { fs = F.getFirestore(app); } // private browsing etc: still works, just without the on-phone backup
+  const wrap = s => ({ docs: s.docs.map(d => ({ id: d.id, data: () => d.data() })), pending: s.metadata.hasPendingWrites, cached: s.metadata.fromCache });
+  return {
+    collection: c => ({ onSnapshot: (cb, err) => F.onSnapshot(F.collection(fs, c), { includeMetadataChanges: true }, s => cb(wrap(s)), err) }),
+    doc: path => { const r = F.doc(fs, path); return { set: d => F.setDoc(r, d), update: d => F.updateDoc(r, d), delete: () => F.deleteDoc(r) }; }
+  };
+}
+// little status badge so people know whether their score has reached everyone
+const sync = { names: {}, scores: {} };
+function showSync(){
+  const all = Object.values(sync), el = $('live');
+  if (!db) return;
+  el.hidden = false;
+  if (all.some(x => x.pending) && !navigator.onLine) { el.className = 'live wait'; el.textContent = '📵 No signal: scores are kept on this phone and sent when it\'s back'; }
+  else if (all.some(x => x.pending)) { el.className = 'live wait'; el.textContent = '⏳ Saving…'; }
+  else if (all.some(x => x.cached) || !navigator.onLine) { el.className = 'live wait'; el.textContent = '📵 Reconnecting…'; }
+  else { el.className = 'live ok'; el.textContent = '🟢 Live: everyone sees the same scores'; }
+}
+addEventListener('online', showSync); addEventListener('offline', showSync);
+// save the page on this phone so it still opens at the lanes with no signal (public link only)
+if (!window.claude && 'serviceWorker' in navigator && /^(https:|http:\/\/localhost)/.test(location.href))
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
 (async () => {
-  if (!window.claude || !window.claude.use) return;
-  const d = await window.claude.use('db');
+  let d = null;
+  if (window.claude && window.claude.use) d = await window.claude.use('db');
+  else try { d = await firebaseDb(); } catch (e) { console.warn('Firebase unavailable', e); }
   if (!d) return;
   db = d;
-  $('syncNote').textContent = '🟢 Live scoreboard — everyone with the link sees the same names and scores.';
-  db.collection('names').onSnapshot(q => { raw.names = byId(q); rebuild(); });
-  db.collection('scores').onSnapshot(q => { raw.scores = byId(q); rebuild(); });
+  $('syncNote').textContent = '🟢 Live scoreboard: everyone with the link sees the same names and scores.';
+  db.collection('names').onSnapshot(q => { raw.names = byId(q); sync.names = q; rebuild(); showSync(); });
+  db.collection('scores').onSnapshot(q => { raw.scores = byId(q); sync.scores = q; rebuild(); showSync(); });
 })();
 
 /* ---------- tournament logic ---------- */
