@@ -203,6 +203,23 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
 .live{display:inline-block;margin:12px 0 0;padding:6px 12px;border-radius:999px;font:700 13px Inter,sans-serif}
 .live.ok{background:#d9f7e7;color:#0b6435}
 .live.wait{background:var(--yellow);color:var(--ink)}
+.inwrap{display:flex;flex-direction:column;align-items:stretch;gap:4px}
+.unsaved{display:inline-block;align-self:flex-start;white-space:nowrap;font:800 11px Inter,sans-serif;background:var(--yellow);color:var(--ink);border-radius:999px;padding:3px 8px;margin-top:4px}
+.inwrap .unsaved{align-self:center}
+input.is-unsaved{border-color:#b38600}
+.keeper-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 12px;background:#f4eefb;font-size:14px;color:var(--ink)}
+.keeper-row .you{font-weight:800;color:#0b6435}
+.iam{min-height:32px;padding:4px 12px;border:0;border-radius:999px;background:var(--plum);color:#fff;font:700 13px Inter,sans-serif;cursor:pointer}
+#hostPanel{margin-top:6px}
+.keeper{display:flex;align-items:center;gap:10px;margin:8px 0}
+.keeper span{flex:none;width:76px;font-weight:700}
+.keeper select{flex:1;min-height:44px}
+.history{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:6px;max-height:360px;overflow:auto}
+.history li{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 10px;font-size:14px}
+.history small{display:block;color:#5a4a6a;margin-top:2px}
+.history .chg{display:inline-block;margin-left:6px;font-weight:800}
+.undo{flex:none;min-width:64px;min-height:40px;border:0;border-radius:999px;background:var(--plum);color:#fff;font:700 14px Inter,sans-serif;cursor:pointer}
+.undone{flex:none;font:700 12px Inter,sans-serif;color:#5a4a6a}
 </style>
 </head>
 <body>
@@ -214,6 +231,7 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
     <p class="sub">The Birthday Bowl-Off · The Gutter, LIC · Sun Oct 18</p>
     <p class="live" id="live" role="status" hidden></p>
   </header>
+  <main>
 
   <section class="card">
     <button class="sec-toggle" id="teamsToggle" aria-expanded="true" aria-controls="teamsBody">
@@ -254,10 +272,19 @@ footer{text-align:center;color:#f3e8ff;font-weight:700;margin-top:10px}
       <button class="btn ghost danger" id="resetScoresBtn">Clear all scores</button>
       <button class="btn ghost danger" id="resetBtn">Reset names &amp; scores</button>
     </div>
+    <div id="hostPanel" hidden>
+      <h3 class="r2h">📋 Scorekeepers</h3>
+      <p class="hint">One person per lane types the totals from the lane screen.</p>
+      <div id="keepers"></div>
+      <h3 class="r2h">🕑 Score history</h3>
+      <p class="hint">Every score change, newest first. Undo puts the old score back (and is logged too).</p>
+      <ul id="history" class="history"></ul>
+    </div>
     <div class="msg err" id="saveMsg" role="status"></div>
     <p class="hint" id="syncNote">Saved on this device only. Pass the host's phone around the lanes to keep one scoreboard.</p>
   </section>
 
+  </main>
   <footer>Don’t forget to serve your best Blue Steel 😗</footer>
 </div>
 
@@ -284,6 +311,12 @@ const blank = () => ({ names: {}, scores: {}, final: {}, third: {} });
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let state = load(), db = null;
+// ?ns=test keeps rehearsals and automated tests out of the real party data
+const NS = (new URLSearchParams(location.search).get('ns') || '').replace(/[^a-z0-9]/gi, '');
+const P = name => NS ? `${NS}_${name}` : name;
+const devId = (() => { try { let d = localStorage.getItem('sap.dev'); if (!d) { d = Math.random().toString(36).slice(2, 6); localStorage.setItem('sap.dev', d); } return d; } catch (e) { return 'anon'; } })();
+let me = ''; try { me = localStorage.getItem('sap.me') || ''; } catch (e) {}
+const whoAmI = () => me || `Phone ${devId}`;
 
 function load(){
   try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.scores) return { ...blank(), ...s }; } catch(e){}
@@ -301,7 +334,7 @@ const teams = () => {
 const team = id => teams().find(t => t.id === id);
 
 /* ---------- shared scoreboard (when opened as a shared page) ---------- */
-const raw = { names: {}, scores: {} };
+const raw = { names: {}, scores: {}, pending: new Set(), keepers: {}, log: [] };
 function rebuild(){
   const s = blank();
   for (const [id, d] of Object.entries(raw.names)) if (d.name) s.names[id] = d.name;
@@ -322,7 +355,7 @@ async function firebaseDb(){
   let fs;
   try { fs = F.initializeFirestore(app, { localCache: F.persistentLocalCache({ tabManager: F.persistentMultipleTabManager() }) }); }
   catch (e) { fs = F.getFirestore(app); } // private browsing etc: still works, just without the on-phone backup
-  const wrap = s => ({ docs: s.docs.map(d => ({ id: d.id, data: () => d.data() })), pending: s.metadata.hasPendingWrites, cached: s.metadata.fromCache });
+  const wrap = s => ({ docs: s.docs.map(d => ({ id: d.id, data: () => d.data(), metadata: d.metadata })), pending: s.metadata.hasPendingWrites, cached: s.metadata.fromCache });
   return {
     collection: c => ({ onSnapshot: (cb, err) => F.onSnapshot(F.collection(fs, c), { includeMetadataChanges: true }, s => cb(wrap(s)), err) }),
     doc: path => { const r = F.doc(fs, path); return { set: d => F.setDoc(r, d), update: d => F.updateDoc(r, d), delete: () => F.deleteDoc(r) }; }
@@ -350,8 +383,15 @@ if (!window.claude && 'serviceWorker' in navigator && /^(https:|http:\/\/localho
   if (!d) return;
   db = d;
   $('syncNote').textContent = '🟢 Live scoreboard: everyone with the link sees the same names and scores.';
-  db.collection('names').onSnapshot(q => { raw.names = byId(q); sync.names = q; rebuild(); showSync(); });
-  db.collection('scores').onSnapshot(q => { raw.scores = byId(q); sync.scores = q; rebuild(); showSync(); });
+  db.collection(P('names')).onSnapshot(q => { raw.names = byId(q); sync.names = q; rebuild(); showSync(); });
+  db.collection(P('scores')).onSnapshot(q => {
+    raw.scores = byId(q); sync.scores = q;
+    // a score is "not saved yet" until the database confirms it, even across a reload with no signal
+    raw.pending = new Set(q.docs.filter(d => d.metadata && d.metadata.hasPendingWrites).map(d => d.id));
+    rebuild(); showSync();
+  });
+  db.collection(P('meta')).onSnapshot(q => { raw.keepers = (byId(q).keepers) || {}; render(); });
+  if (hostUnlocked) watchLog();
 })();
 
 /* ---------- tournament logic ---------- */
@@ -409,6 +449,7 @@ function render(){
     const status = w ? 'Winner in!' : tied ? 'Tie! Roll-off +1' : 'In play';
     return `<div class="lane l${i+1}">
       <div class="lane-title">${LANE_DOT[i+1]} Lane ${i+1}<span class="status">${status}</span></div>
+      ${keeperRow(i + 1)}
       ${sideHTML(pair[0], w, 'scores')}
       <div class="vs">VS</div>
       ${sideHTML(pair[1], w, 'scores')}
@@ -432,6 +473,7 @@ function render(){
     const seed = t => r2.bronze.indexOf(t) + 3, ord = n => n + (n === 3 ? 'rd' : 'th');
     const match = (pair, laneNo) => { const w = best(pair, 'third'); return `<div class="lane l${laneNo}">
         <div class="lane-title">${LANE_DOT[laneNo]} Lane ${laneNo} · ${ord(seed(pair[0]))} vs ${ord(seed(pair[1]))}<span class="status">${w === 'tie' ? 'Tie' : w ? 'Done' : 'In play'}</span></div>
+        ${keeperRow(laneNo)}
         ${sideHTML(pair[0], br, 'third', `${ord(seed(pair[0]))} seed`)}
         <div class="vs">VS</div>
         ${sideHTML(pair[1], br, 'third', `${ord(seed(pair[1]))} seed`)}
@@ -443,6 +485,7 @@ function render(){
       ${ch === 'tie' ? `<p class="swap">🎳 Tied for the crown! ${tiedNames(r2.finalists, 'final')} bowl a roll-off, then add 1 to the winner's Round 2 score.</p>` : ''}
       <div class="lane l1">
         <div class="lane-title">${LANE_DOT[1]} Lane 1<span class="status">${ch === 'tie' ? 'Tie! Roll-off' : ch ? 'Crowned!' : 'In play'}</span></div>
+        ${keeperRow(1)}
         ${sideHTML(r2.finalists[0], ch, 'final')}
         <div class="vs">VS</div>
         ${sideHTML(r2.finalists[1], ch, 'final')}
@@ -456,6 +499,7 @@ function render(){
         <div class="podium">🥈 ${esc(runner.name)}${br && br !== 'tie' ? ` &nbsp; 🥉 ${esc(br.name)}` : ''}</div>
         ${lost.length ? `<div class="read">💅 And the losers get read: ${lost.map(t => `<b>${esc(t.name)}</b>`).join(', ')} — “${READS[lost.length % READS.length]}”</div>` : ''}</div>` : '');
   }
+  renderHost();
   rendering = false;
   if (keep) { const el = document.querySelector(keep); if (el) { el.value = draft; el.focus(); } }
 }
@@ -496,15 +540,23 @@ function teamCard(t){
   </div>`;
 }
 
+const keeperRow = n => {
+  const k = raw.keepers[n];
+  if (!k) return '';
+  return `<div class="keeper-row">📋 <b>${esc(k)}</b> keeps score here${me === k ? ' <span class="you">That\'s you</span>'
+    : !me ? ` <button class="iam" data-iam="${esc(k)}">I'm ${esc(k)}</button>` : ''}</div>`;
+};
 const people = t => `<div class="ppl">${t.members.map(m => `<span>${esc(m)}</span>`).join('')}</div>`;
 function sideHTML(t, winner, bucket, note){
   const v = state[bucket][t.id];
   const win = winner && winner !== 'tie' && winner.id === t.id;
-  const input = ph => `<input type="number" inputmode="numeric" min="0" max="${t.members.length * MAX_SCORE}" step="1" placeholder="${ph}"
+  const unsaved = raw.pending.has(t.id) && v != null;
+  const flag = unsaved ? '<span class="unsaved" role="status">⏳ Not saved yet</span>' : '';
+  const input = ph => `<input class="${unsaved ? 'is-unsaved' : ''}" type="number" inputmode="numeric" min="0" max="${t.members.length * MAX_SCORE}" step="1" placeholder="${ph}"
       aria-label="${esc(t.name)} ${bucket === 'scores' ? 'Round 1 total' : 'Round 2 score'}" data-b="${bucket}" data-t="${t.id}" value="${v ?? ''}">`;
   if (bucket === 'scores') return `<div class="side ${win ? 'win' : ''}">
     <div class="who"><b>${esc(t.name)}</b></div>
-    ${input('Total')}
+    <div class="inwrap">${input('Total')}${flag}</div>
     ${people(t)}
   </div>`;
   // Round 2: show the sum right on the card so it's obvious Round 1 is added in
@@ -516,6 +568,7 @@ function sideHTML(t, winner, bucket, note){
       <span class="cell in"><small>Round 2</small>${input('Type')}</span><i aria-hidden="true">=</i>
       <span class="cell tot"><small>Total</small><b>${v == null ? '—' : r1 + v}</b></span>
     </div>
+    ${flag}
   </div>`;
 }
 
@@ -525,7 +578,7 @@ function showDialog(text, body, buttons){
     if (document.querySelector('.dlg')) return res(false); // never stack dialogs
     const d = document.createElement('div');
     d.className = 'dlg';
-    d.innerHTML = `<div class="dlg-box" role="dialog" aria-modal="true"><p>${esc(text)}</p>
+    d.innerHTML = `<div class="dlg-box" role="dialog" aria-modal="true" aria-labelledby="dlgText"><p id="dlgText">${esc(text)}</p>
       ${body != null ? `<textarea readonly rows="8">${esc(body)}</textarea>` : ''}
       <div class="e-actions">${buttons.map(([l, v, danger], i) => `<button class="btn ${v ? (danger ? 'danger' : '') : 'ghost'}" data-dlg="${i}">${esc(l)}</button>`).join('')}</div></div>`;
     d.addEventListener('click', e => {
@@ -545,7 +598,10 @@ const PIN_HASH = '1f5004fe';
 const hashPin = pin => { let h = 0x811c9dc5; for (const c of 'strikeapose:' + pin) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return h.toString(16); };
 let hostUnlocked = false;
 try { hostUnlocked = sessionStorage.getItem('sap.host') === PIN_HASH; } catch (e) {}
-function showHost(){ $('hostTools').hidden = !hostUnlocked; $('lockForm').hidden = hostUnlocked; }
+function showHost(){
+  $('hostTools').hidden = !hostUnlocked; $('hostPanel').hidden = !hostUnlocked; $('lockForm').hidden = hostUnlocked;
+  if (hostUnlocked) { watchLog(); renderHost(); }
+}
 $('lockForm').addEventListener('submit', e => {
   e.preventDefault();
   if (hashPin($('pin').value.trim()) === PIN_HASH) {
@@ -570,7 +626,7 @@ document.addEventListener('submit', e => {
   if (ROSTER.some(x => x.id !== id && (state.names[x.id] || defaultName(x)).toLowerCase() === name.toLowerCase())) { err.textContent = 'Another team already has that name. Be original, darling.'; return input.focus(); }
   if (/^team [a-f]$/i.test(name) && name.toUpperCase() !== defaultName(t).toUpperCase()) { err.textContent = 'That looks like another team\'s placeholder. Pick something fabulous.'; return input.focus(); }
   err.textContent = '';
-  if (db) db.doc('names/' + id).set({ name }).catch(oops);
+  if (db) db.doc(P('names') + '/' + id).set({ name }).catch(oops);
   state.names[id] = name; save();
   renaming.delete(id); flash[id] = Date.now() + 3000;
   input.blur(); render();
@@ -583,6 +639,21 @@ document.addEventListener('click', e => {
 });
 
 // scores
+const FIELD = { scores: 'r1', final: 'final', third: 'third' };
+const ROUND_LABEL = { r1: 'Round 1', final: 'Round 2 (Championship)', third: 'Round 2 (3rd place)' };
+function setScore(t, b, v, extra = {}){
+  const f = FIELD[b], from = state[b][t] ?? null;
+  if (from === v) return;
+  if (db) {
+    const ref = db.doc(P('scores') + '/' + t);
+    // merge just this field so two phones scoring different rounds can't overwrite each other
+    (raw.scores[t] ? ref.update({ [f]: v }) : ref.set({ r1: null, final: null, third: null, ...raw.scores[t], [f]: v })).catch(oops);
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    db.doc(P('log') + '/' + id).set({ at: Date.now(), team: t, field: f, from, to: v, by: whoAmI(), ...extra }).catch(oops);
+  }
+  if (v == null) delete state[b][t]; else state[b][t] = v;
+  save(); render();
+}
 function commitScore(el, loud){
   const { b, t } = el.dataset, tm = team(t);
   if (!tm) return;
@@ -594,15 +665,7 @@ function commitScore(el, loud){
       .then(() => { el.value = state[b][t] ?? ''; el.classList.remove('bad'); el.focus(); });
     return;
   }
-  const v = val === '' ? null : n;
-  if ((state[b][t] ?? null) === v) return;
-  if (db) {
-    const f = b === 'scores' ? 'r1' : b;
-    // merge just this field so two phones scoring different rounds can't overwrite each other
-    (raw.scores[t] ? db.doc('scores/' + t).update({ [f]: v }) : db.doc('scores/' + t).set({ r1: null, final: null, third: null, ...raw.scores[t], [f]: v })).catch(oops);
-  }
-  if (v == null) delete state[b][t]; else state[b][t] = v;
-  save(); render();
+  setScore(t, b, val === '' ? null : n);
 }
 let typingTimer;
 document.addEventListener('change', e => { if (e.target.dataset.b && !rendering) commitScore(e.target, true); });
@@ -615,17 +678,85 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden && el && el.dataset && el.dataset.b) commitScore(el, false);
 });
 
+/* ---------- host: change history with undo, scorekeepers ---------- */
+function logBulk(what, snapshot){
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  db.doc(P('log') + '/' + id).set({ at: Date.now(), bulk: what, snapshot: JSON.stringify(snapshot), by: whoAmI() }).catch(oops);
+}
+let logWatched = false;
+function watchLog(){
+  if (logWatched || !db) return; logWatched = true;
+  db.collection(P('log')).onSnapshot(q => {
+    raw.log = q.docs.map(d => ({ id: d.id, ...d.data(), pending: !!(d.metadata && d.metadata.hasPendingWrites) })).sort((a, b) => b.at - a.at);
+    renderHost();
+  });
+}
+const BUCKET = { r1: 'scores', final: 'final', third: 'third' };
+function renderHost(){
+  if (!hostUnlocked) return;
+  // scorekeepers (left alone while the host is picking one)
+  if (!$('keepers').contains(document.activeElement)) $('keepers').innerHTML = [1, 2, 3].map(n => {
+    const ppl = ROSTER.filter(r => r.lane === n).flatMap(r => r.members);
+    return `<label class="keeper"><span>${LANE_DOT[n]} Lane ${n}</span><select data-keeper="${n}" aria-label="Lane ${n} scorekeeper">
+      <option value="">Pick scorekeeper…</option>${ppl.map(p => `<option ${raw.keepers[n] === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select></label>`;
+  }).join('');
+  // history
+  if (!db) { $('history').innerHTML = '<p class="hint">History appears once the live scoreboard is connected.</p>'; return; }
+  const undone = new Set(raw.log.filter(l => l.undoOf).map(l => l.undoOf));
+  const time = at => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+  $('history').innerHTML = raw.log.length ? raw.log.map(l => {
+    const by = `<small>${time(l.at)} · by ${esc(l.by || '?')}${l.pending ? ' · ⏳ not saved yet' : ''}</small>`;
+    if (l.bulk) return `<li><div><b>🧹 ${esc(l.bulk)}</b>${by}</div>${undone.has(l.id) ? '<span class="undone">Undone</span>' : `<button class="undo" data-undo="${l.id}">Undo</button>`}</li>`;
+    const tm = team(l.team), what = l.undoOf ? '↩️ Undo: ' : '';
+    return `<li><div><b>${what}${esc(tm ? tm.name : l.team)}</b> · ${ROUND_LABEL[l.field]}<span class="chg">${l.from ?? '—'} → ${l.to ?? '—'}</span>${by}</div>
+      ${l.undoOf ? '' : undone.has(l.id) ? '<span class="undone">Undone</span>' : `<button class="undo" data-undo="${l.id}" aria-label="Undo ${esc(tm ? tm.name : l.team)} ${ROUND_LABEL[l.field]} change">Undo</button>`}</li>`;
+  }).join('') : '<p class="hint">No score changes yet.</p>';
+}
+document.addEventListener('change', e => {
+  const n = e.target.dataset.keeper;
+  if (!n || !hostOnly()) return;
+  const keepers = { ...raw.keepers, [n]: e.target.value || null };
+  raw.keepers = keepers;
+  if (db) db.doc(P('meta') + '/keepers').set(keepers).catch(oops);
+  render();
+});
+document.addEventListener('click', async e => {
+  const { undo, iam } = e.target.dataset;
+  if (iam) { me = iam; try { localStorage.setItem('sap.me', me); } catch (err) {} render(); return; }
+  if (!undo || !hostOnly()) return;
+  const l = raw.log.find(x => x.id === undo);
+  if (!l) return;
+  if (l.bulk) {
+    if (!await ask(`Undo "${l.bulk}"? Every score${l.bulk.includes('names') ? ' and team name' : ''} goes back to how it was.`, 'Undo')) return;
+    const snap = JSON.parse(l.snapshot || '{}');
+    for (const [id, d] of Object.entries(snap.scores || {})) db.doc(P('scores') + '/' + id).set(d).catch(oops);
+    for (const [id, d] of Object.entries(snap.names || {})) db.doc(P('names') + '/' + id).set(d).catch(oops);
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    db.doc(P('log') + '/' + id).set({ at: Date.now(), bulk: 'Undid: ' + l.bulk, undoOf: l.id, by: whoAmI() }).catch(oops);
+    return;
+  }
+  const b = BUCKET[l.field], now = state[b][l.team] ?? null;
+  if (now !== l.to && !await ask(`${team(l.team).name}'s ${ROUND_LABEL[l.field]} score has changed again since (it's now ${now ?? 'empty'}). Set it back to ${l.from ?? 'empty'} anyway?`, 'Set it back')) return;
+  setScore(l.team, b, l.from, { undoOf: l.id });
+});
+
 $('resetScoresBtn').onclick = async () => {
   if (!hostOnly()) return;
   if (!await ask('Clear every score in both rounds? Team names stay.', 'Clear scores', true)) return;
-  if (db) ROSTER.forEach(t => db.doc('scores/' + t.id).delete().catch(oops));
+  if (db) {
+    logBulk('Cleared all scores', { scores: raw.scores });
+    ROSTER.forEach(t => db.doc(P('scores') + '/' + t.id).delete().catch(oops));
+  }
   state = { ...blank(), names: state.names };
   save(); render();
 };
 $('resetBtn').onclick = async () => {
   if (!hostOnly()) return;
   if (!await ask('Wipe every team name and score? Teams go back to Team A–F. This can’t be undone.', 'Reset names & scores', true)) return;
-  if (db) ROSTER.forEach(t => { db.doc('scores/' + t.id).delete().catch(oops); db.doc('names/' + t.id).delete().catch(oops); });
+  if (db) {
+    logBulk('Reset names & scores', { scores: raw.scores, names: raw.names });
+    ROSTER.forEach(t => { db.doc(P('scores') + '/' + t.id).delete().catch(oops); db.doc(P('names') + '/' + t.id).delete().catch(oops); });
+  }
   state = blank();
   save(); render();
 };
