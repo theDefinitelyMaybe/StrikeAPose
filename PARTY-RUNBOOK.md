@@ -70,24 +70,24 @@ For each lane, with the screen photo next to the page:
 | 🧡 3 | Team F ________ | ___ + ___ + ___ | ____ | ____ | ☐ |
 
 - [ ] Each "Page total" matches the screen total. If not: scorekeeper retypes it; check **Score history** shows the fix.
-- [ ] Every lane says **Winner in!** (or "Tie! Roll-off +1" → bowl a roll-off, add 1 to the winner's total).
-- [ ] Round 2 shows the matchups: Lane 1 = Championship (top 2 lane winners), Lanes 2 & 3 = 3rd-place games.
+- [ ] All 6 teams have a Round 1 total (Round 1 folds itself up when they do).
+- [ ] Teams move to their Round 2 lanes: **Lane 1 = Team A vs Team E · Lane 2 = Team C vs Team B · Lane 3 = Team F vs Team D**.
 - [ ] Badge says **🟢 Live** on the host phone and no **⏳ Not saved yet** flags anywhere.
 
 ### After Round 2
 
 | Lane | Team | Screen game total (3 bowlers) | Page "Round 2" box | Page "Total" = Round 1 + Round 2 | Match? |
 |---|---|---|---|---|---|
-| 🩷 1 | ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
-| 🩷 1 | ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
-| 💙 2 | ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
-| 💙 2 | ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
-| 🧡 3 | ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
-| 🧡 3 | ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
+| 🩷 1 | Team A ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
+| 🩷 1 | Team E ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
+| 💙 2 | Team C ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
+| 💙 2 | Team B ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
+| 🧡 3 | Team F ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
+| 🧡 3 | Team D ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
 
 - [ ] Each "Round 2" box matches the screen's game total (only this game — the page adds Round 1 itself).
-- [ ] The champion banner and 🥈 / 🥉 match the highest grand totals in the table.
-- [ ] Ties show a roll-off message; resolve before announcing.
+- [ ] The **📊 Standings** list matches the grand totals above, highest first. The champion is the highest grand total overall, not the lane winner.
+- [ ] A tie for 1st, 2nd or 3rd shows a roll-off message: bowl it, then add 1 to the winner's Round 2 score before announcing.
 - [ ] Host Tools → **Copy results** → paste into the group chat.
 
 ---
