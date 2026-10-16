@@ -267,6 +267,14 @@ input.is-unsaved{border-color:#b38600}
 .champ .podium{line-height:1.4;display:flex;flex-wrap:wrap;justify-content:center;gap:2px 16px}
 .history li > div{text-wrap:pretty}
 .read{line-height:1.4}
+/* Round 1 row: name + bowlers stacked on the left, score box centred on the right — no dead corner */
+.side:not(.r2){grid-template-columns:minmax(0,1fr) 84px;grid-template-rows:auto auto;column-gap:14px;row-gap:8px;align-items:center;padding:14px 12px}
+.side:not(.r2) .who{grid-column:1;grid-row:1;align-self:end}
+.side:not(.r2) .ppl{grid-column:1;grid-row:2;align-self:start;gap:5px}
+.side:not(.r2) .inwrap{grid-column:2;grid-row:1 / span 2;align-self:center}
+.side:not(.r2) .ppl span{height:26px;padding:0 8px;font-size:13px}
+.side:not(.r2) .ppl{gap:4px}
+.side:not(.r2) input{min-height:56px;padding:6px 4px}
 </style>
 </head>
 <body>
