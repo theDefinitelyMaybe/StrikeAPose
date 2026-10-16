@@ -281,6 +281,7 @@ input.is-unsaved{border-color:#b38600}
 .standings .rk{font-weight:800;font-size:18px;text-align:center;color:var(--plum)}
 .standings b{font-size:16px;overflow-wrap:anywhere}
 .standings .gt{font:800 20px Inter,sans-serif;color:var(--ink)}
+#results:not(:empty){margin-top:10px}
 </style>
 </head>
 <body>
@@ -315,9 +316,14 @@ input.is-unsaved{border-color:#b38600}
   </section>
 
   <section class="card">
-    <h2>🏆 Round 2</h2>
-    <p class="hint lead">New matchups! Type only your team's <b>Round 2 score</b>. Your Round 1 score is added in, and the <b>highest grand total</b> wins.</p>
-    <div id="final"></div>
+    <button class="sec-toggle" id="r2Toggle" aria-expanded="true" aria-controls="r2Body">
+      <h2>🏆 Round 2</h2><span class="tag" id="r2Count">0/6 scored</span><span class="chev" aria-hidden="true">▾</span>
+    </button>
+    <div id="r2Body">
+      <p class="hint lead">New matchups! Type only your team's <b>Round 2 score</b>. Your Round 1 score is added in, and the <b>highest grand total</b> wins.</p>
+      <div id="final"></div>
+    </div>
+    <div id="results"></div>
   </section>
 
   <section class="card">
@@ -555,7 +561,13 @@ function render(){
       <ol class="standings">${st.done.map((x, i) => `<li class="${x.t === st.gold ? 'top' : ''}"><span class="rk">${i < 3 && st.all ? medal[i] : i + 1}</span><b>${esc(x.t.name)}</b><span class="gt">${x.g}</span></li>`).join('')}</ol>
       ${st.all ? '' : `<p class="hint">${6 - st.done.length} team${6 - st.done.length === 1 ? '' : 's'} still to finish Round 2.</p>`}` : '';
   const losers = st.gold ? st.done.slice(3).map(x => x.t) : [];
-  patch($('final'), R2_LANES.map(r2lane).join('') + tieNote + table +
+  // the lanes fold away once a champion is crowned; standings and the banner stay visible
+  const r2Done = teams().filter(t => state.final[t.id] != null).length;
+  $('r2Count').textContent = `${r2Done}/6 scored`;
+  $('r2Count').classList.toggle('all', r2Done === 6);
+  fold('r2', !st.gold || (keep && keep.includes('"final"')));
+  patch($('final'), R2_LANES.map(r2lane).join(''));
+  patch($('results'), tieNote + table +
     (st.gold ? `<div class="champ">🪩 Champions 🪩<span class="big">${esc(st.gold.name)}</span>
       <small>${st.gold.members.map(esc).join(' · ')}</small>
       <div class="podium">${st.silver ? `<span>🥈 ${esc(st.silver.name)}</span>` : ''}${st.bronze ? ` <span>🥉 ${esc(st.bronze.name)}</span>` : ''}</div>
@@ -568,7 +580,7 @@ function render(){
 const renaming = new Set(), flash = {};
 // foldable sections: fold themselves when done, unless this phone toggled them by hand
 const foldPref = {};
-for (const k of ['teams', 'r1']) {
+for (const k of ['teams', 'r1', 'r2']) {
   try { const v = localStorage.getItem('sap.open.' + k); if (v) foldPref[k] = v === '1'; } catch (e) {}
   $(k + 'Toggle').onclick = () => {
     foldPref[k] = $(k + 'Body').hidden;
@@ -577,7 +589,7 @@ for (const k of ['teams', 'r1']) {
   };
 }
 function fold(k, autoOpen){
-  const open = foldPref[k] ?? autoOpen;
+  const open = !!(foldPref[k] ?? autoOpen);
   $(k + 'Body').hidden = !open; $(k + 'Toggle').setAttribute('aria-expanded', open);
 }
 function teamCard(t){
