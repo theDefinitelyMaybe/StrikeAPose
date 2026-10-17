@@ -47,6 +47,7 @@ Roles: **You = host**, **Friend 1 = Lane 1 scorekeeper (Ju)**, **Friend 2 = Lane
 - **Host:** keeps Host Tools unlocked on their own phone, checks totals against the lane screens (checklist below), fixes mistakes with **Undo** in Score history.
 
 To fix a typo, tap the score: the old number is selected, so just type the right one.
+Sections fold themselves once every value is in. To fix one, tap the section header to reopen it; it folds again after your fix saves.
 
 If a phone shows **⏳ Not saved yet**, don't retype — it sends itself when signal returns. Only worry if the flag stays for more than a minute *and* the badge says 🟢 Live; then ask that scorekeeper to re-enter.
 

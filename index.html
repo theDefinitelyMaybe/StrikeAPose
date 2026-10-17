@@ -555,7 +555,7 @@ function render(){
       ${sideHTML(pair[1], st.gold, 'final')}
     </div>`;
   };
-  const tieNote = st.ties.length ? `<p class="swap">🎳 Tie for ${st.ties.map(i => ['1st', '2nd', '3rd'][i]).join(' / ')} place: ${st.ties.map(i => `${esc(st.done[i].t.name)} & ${esc(st.done[i + 1].t.name)}`).join('; ')}. Bowl a roll-off, then add 1 to the winner's Round 2 score.</p>` : '';
+  const tieNote = st.ties.length ? `<p class="swap">🎳 Tie for ${st.ties.map(i => ['1st', '2nd', '3rd'][i]).join(' / ')} place: ${st.ties.map(i => `${esc(st.done[i].t.name)} & ${esc(st.done[i + 1].t.name)}`).join('; ')}. Bowl a roll-off, then tap Round 2 and add 1 to the winner's score.</p>` : '';
   const medal = ['🥇', '🥈', '🥉'];
   const table = st.done.length ? `<h3 class="r2h">📊 Standings</h3>
       <ol class="standings">${st.done.map((x, i) => `<li class="${x.t === st.gold ? 'top' : ''}"><span class="rk">${i < 3 && st.all ? medal[i] : i + 1}</span><b>${esc(x.t.name)}</b><span class="gt">${x.g}</span></li>`).join('')}</ol>
@@ -565,7 +565,7 @@ function render(){
   const r2Done = teams().filter(t => state.final[t.id] != null).length;
   $('r2Count').textContent = `${r2Done}/6 scored`;
   $('r2Count').classList.toggle('all', r2Done === 6);
-  fold('r2', !st.gold || (keep && keep.includes('"final"')));
+  fold('r2', r2Done < 6 || (keep && keep.includes('"final"')));
   patch($('final'), R2_LANES.map(r2lane).join(''));
   patch($('results'), tieNote + table +
     (st.gold ? `<div class="champ">🪩 Champions 🪩<span class="big">${esc(st.gold.name)}</span>
@@ -579,17 +579,23 @@ function render(){
 
 const renaming = new Set(), flash = {};
 // foldable sections: fold themselves when done, unless this phone toggled them by hand
-const foldPref = {};
+// A section folds itself as soon as all its values are in. Tapping the header overrides that only
+// until the section's state changes or a value in it is saved (e.g. after fixing a typo it folds again).
+const foldPref = {}, autoState = {};
+let keepOpen = false; try { keepOpen = localStorage.getItem('sap.testOpen') === '1'; } catch (e) {} // automated tests only
+const saveFold = k => { try { foldPref[k] ? localStorage.setItem('sap.fold.' + k, JSON.stringify(foldPref[k])) : localStorage.removeItem('sap.fold.' + k); } catch (e) {} };
 for (const k of ['teams', 'r1', 'r2']) {
-  try { const v = localStorage.getItem('sap.open.' + k); if (v) foldPref[k] = v === '1'; } catch (e) {}
+  try { const v = JSON.parse(localStorage.getItem('sap.fold.' + k)); if (v && typeof v.open === 'boolean') foldPref[k] = v; } catch (e) {}
   $(k + 'Toggle').onclick = () => {
-    foldPref[k] = $(k + 'Body').hidden;
-    try { localStorage.setItem('sap.open.' + k, foldPref[k] ? '1' : '0'); } catch (e) {}
-    render();
+    foldPref[k] = { open: $(k + 'Body').hidden, auto: autoState[k] };
+    saveFold(k); render();
   };
 }
+const releaseFold = k => { if (foldPref[k]) { delete foldPref[k]; saveFold(k); } };
 function fold(k, autoOpen){
-  const open = !!(foldPref[k] ?? autoOpen);
+  autoOpen = !!autoOpen; autoState[k] = autoOpen;
+  if (foldPref[k] && foldPref[k].auto !== autoOpen) releaseFold(k); // things changed: back to automatic
+  const open = keepOpen || (foldPref[k] ? foldPref[k].open : autoOpen);
   $(k + 'Body').hidden = !open; $(k + 'Toggle').setAttribute('aria-expanded', open);
 }
 function teamCard(t){
@@ -702,7 +708,7 @@ document.addEventListener('submit', e => {
   err.textContent = '';
   if (db) db.doc(P('names') + '/' + id).set({ name }).catch(oops);
   state.names[id] = name; save();
-  renaming.delete(id); flash[id] = Date.now() + 3000;
+  renaming.delete(id); flash[id] = Date.now() + 3000; releaseFold('teams');
   input.blur(); render();
   setTimeout(render, 3100);
 });
@@ -725,6 +731,7 @@ function setScore(t, b, v, extra = {}){
     db.doc(P('log') + '/' + id).set({ at: Date.now(), team: t, field: f, from, to: v, by: whoAmI(), ...extra }).catch(oops);
   }
   if (v == null) delete state[b][t]; else state[b][t] = v;
+  releaseFold(b === 'scores' ? 'r1' : 'r2');
   save(); render();
 }
 function commitScore(el, loud){
