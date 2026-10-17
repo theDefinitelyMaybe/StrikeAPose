@@ -89,7 +89,7 @@ input:focus,select:focus{outline:none;border-color:var(--pink);box-shadow:0 0 0 
 .champ small{font-family:Inter,sans-serif;color:#f3e8ff;font-weight:600}
 .read{margin-top:10px;font-family:Inter,sans-serif;font-weight:600;color:var(--ink);background:var(--yellow);border-radius:10px;padding:10px}
 
-.l1{--lc:#c8176f} .l2{--lc:#1d5bd1} .l3{--lc:#b34a00}
+.l1{--lc:#1e6b35} .l2{--lc:#1d5bd1} .l3{--lc:#8a6a00}
 .lane.l1 .lane-title,.lane.l2 .lane-title,.lane.l3 .lane-title{background:var(--lc)}
 .lane.l1,.lane.l2,.lane.l3{border-color:var(--lc)}
 .team.l1,.team.l2,.team.l3{border-left:8px solid var(--lc)}
@@ -359,7 +359,7 @@ input.is-unsaved{border-color:#b38600}
 const LANES = 3, MAX_SCORE = 300, KEY = 'strikeapose.v3';
 // Pre-assigned teams. Lanes and bowlers are fixed; teams only choose their name.
 const ROSTER = [
-  { id: 'A', lane: 1, members: ['Ju', 'Albert', 'Andrew'] },
+  { id: 'A', lane: 1, members: ['Ju', 'Albert'] },
   { id: 'B', lane: 1, members: ['Aaron', 'Kiet', 'Zeeshan'] },
   { id: 'C', lane: 2, members: ['TJ', 'LQ', 'Ollie'] },
   { id: 'D', lane: 2, members: ['Greg', 'Richard', 'James'] },
@@ -373,7 +373,7 @@ const READS = [
   "Serving looks? Yes. Serving strikes? Absolutely not.",
   "The shoes have seen things, and they've never seen worse."
 ];
-const LANE_DOT = { 1: '🩷', 2: '💙', 3: '🧡' };
+const LANE_DOT = { 1: '💚', 2: '💙', 3: '💛' };
 const blank = () => ({ names: {}, scores: {}, final: {}, third: {} });
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

@@ -62,12 +62,12 @@ For each lane, with the screen photo next to the page:
 
 | Lane | Team | Screen: bowler 1 + bowler 2 + bowler 3 | = Screen total | Page total | Match? |
 |---|---|---|---|---|---|
-| 🩷 1 | Team A ________ | ___ + ___ + ___ | ____ | ____ | ☐ |
-| 🩷 1 | Team B ________ | ___ + ___ + ___ | ____ | ____ | ☐ |
+| 💚 1 | Team A ________ | ___ + ___ | ____ | ____ | ☐ |
+| 💚 1 | Team B ________ | ___ + ___ + ___ | ____ | ____ | ☐ |
 | 💙 2 | Team C ________ | ___ + ___ + ___ | ____ | ____ | ☐ |
 | 💙 2 | Team D ________ | ___ + ___ + ___ | ____ | ____ | ☐ |
-| 🧡 3 | Team E ________ | ___ + ___ + ___ | ____ | ____ | ☐ |
-| 🧡 3 | Team F ________ | ___ + ___ + ___ | ____ | ____ | ☐ |
+| 💛 3 | Team E ________ | ___ + ___ + ___ | ____ | ____ | ☐ |
+| 💛 3 | Team F ________ | ___ + ___ + ___ | ____ | ____ | ☐ |
 
 - [ ] Each "Page total" matches the screen total. If not: scorekeeper retypes it; check **Score history** shows the fix.
 - [ ] All 6 teams have a Round 1 total (Round 1 folds itself up when they do).
@@ -78,12 +78,12 @@ For each lane, with the screen photo next to the page:
 
 | Lane | Team | Screen game total (3 bowlers) | Page "Round 2" box | Page "Total" = Round 1 + Round 2 | Match? |
 |---|---|---|---|---|---|
-| 🩷 1 | Team A ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
-| 🩷 1 | Team E ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
+| 💚 1 | Team A ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
+| 💚 1 | Team E ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
 | 💙 2 | Team C ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
 | 💙 2 | Team B ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
-| 🧡 3 | Team F ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
-| 🧡 3 | Team D ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
+| 💛 3 | Team F ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
+| 💛 3 | Team D ________ | ____ | ____ | ____ + ____ = ____ | ☐ |
 
 - [ ] Each "Round 2" box matches the screen's game total (only this game — the page adds Round 1 itself).
 - [ ] The **📊 Standings** list matches the grand totals above, highest first. The champion is the highest grand total overall, not the lane winner.
